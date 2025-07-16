@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserRoleSelector } from "@/components/user-role-selector"
 import { DashboardOverview } from "@/components/dashboard-overview"
@@ -9,28 +9,41 @@ import { ErrorAnalysisDashboard } from "@/components/error-analysis-dashboard"
 import { LeadershipDashboard } from "@/components/leadership-dashboard"
 import { AgentPerformanceDashboard } from "@/components/agent-performance-dashboard"
 import { TeamLeadOperations } from "@/components/team-lead-operations"
+import { AIMonitoringDashboard } from "@/components/ai-monitoring-dashboard"
+
+
 
 export default function VideoKYCDashboard() {
-  const [userRole, setUserRole] = useState<"admin" | "team-lead" | "employee">("admin")
+  const [userRole, setUserRole] = useState<"admin" | "team-lead" | "agent">("admin")
+
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
+  const [selectedTab, setSelectedTab] = useState("overview") // ✅ Step 1
 
   const handleAgentSelect = (agentId: string) => {
     setSelectedAgent(agentId)
   }
+
+  useEffect(() => {
+    setSelectedTab("overview") // ✅ Step 2
+  }, [userRole])
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Video KYC Employee Performance Dashboard</h1>
-          <UserRoleSelector currentRole={userRole} onRoleChange={setUserRole} />
+          <UserRoleSelector
+            currentRole={userRole === "agent" ? "employee" : userRole}
+            onRoleChange={(role) => setUserRole(role === "employee" ? "agent" : role)}
+          />
+
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6"> {/* ✅ Step 3 */}
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="performance">
-              {userRole === "employee" ? "My Performance" : "Agent Performance"}
+              {userRole === "agent" ? "My Performance" : "Agent Performance"}
             </TabsTrigger>
             <TabsTrigger value="errors">Error Analysis</TabsTrigger>
             {(userRole === "admin" || userRole === "team-lead") && (
@@ -38,11 +51,13 @@ export default function VideoKYCDashboard() {
             )}
             <TabsTrigger value="calls">Calls Analytics</TabsTrigger>
             {userRole === "admin" && <TabsTrigger value="leadership">Global Leadership</TabsTrigger>}
+            {userRole === "admin" && <TabsTrigger value="Ai-monitoring">Ai Monitoring</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="overview">
-            <DashboardOverview userRole={userRole} />
+            <DashboardOverview userRole={userRole === "agent" ? "employee" : userRole} />
           </TabsContent>
+
 
           <TabsContent value="performance">
             <AgentPerformanceDashboard
@@ -63,12 +78,18 @@ export default function VideoKYCDashboard() {
           )}
 
           <TabsContent value="calls">
-            <CallsAnalytics userRole={userRole} />
+            <CallsAnalytics userRole={userRole === "agent" ? "employee" : userRole} />
           </TabsContent>
 
           {userRole === "admin" && (
             <TabsContent value="leadership">
-              <LeadershipDashboard />
+              <LeadershipDashboard onAgentSelect={handleAgentSelect} />
+            </TabsContent>
+          )}
+
+          {userRole === "admin" && (
+            <TabsContent value="Ai-monitoring">
+              <AIMonitoringDashboard />
             </TabsContent>
           )}
         </Tabs>
@@ -76,3 +97,4 @@ export default function VideoKYCDashboard() {
     </div>
   )
 }
+

@@ -18,10 +18,36 @@ interface AIFlag {
   description: string
   detectedAt: string
   confidence: number
-  evidence: any
+  evidence:
+    | {
+        totalBreakTime: number
+        expectedBreakTime: number
+        breakFrequency: number
+        timePattern: string
+      }
+    | {
+        callsExpected: number
+        callsHandled: number
+        activeTime: number
+        callFlowRate: string
+        systemStatus: string
+      }
+    | {
+        awayTime: number
+        breakMarked: boolean
+        lastActivity: string
+        systemDetection: string
+      }
+    | {
+        currentApprovalRate: number
+        expectedRate: number
+        recentCalls: number
+        declinePattern: string
+      }
   status: "active" | "investigating" | "resolved"
   autoResolved: boolean
 }
+
 
 interface AgentMetrics {
   agentId: string

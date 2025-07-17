@@ -1,40 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Users, AlertTriangle, CheckCircle, Clock, Activity } from "lucide-react"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchRealTimeMetrics } from "../lib/services/realTimeMetricsApi";
 
 export function RealTimeMetrics() {
-  const [metrics, setMetrics] = useState({
-    totalAgents: 45,
-    activeAgents: 38,
-    onBreakAgents: 4,
-    flaggedAgents: 3,
-    totalCalls: 1247,
-    avgWaitTime: 2.3,
-    successRate: 94.2,
-    systemHealth: 98.5,
-  })
+  const { data: metrics, loading, error } = useMockApi(fetchRealTimeMetrics);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  const [lastUpdate, setLastUpdate] = useState(new Date())
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Simulate real-time updates
-      setMetrics((prev) => ({
-        ...prev,
-        totalCalls: prev.totalCalls + Math.floor(Math.random() * 3),
-        avgWaitTime: Math.max(1.0, prev.avgWaitTime + (Math.random() - 0.5) * 0.2),
-        successRate: Math.min(100, Math.max(85, prev.successRate + (Math.random() - 0.5) * 0.5)),
-        systemHealth: Math.min(100, Math.max(95, prev.systemHealth + (Math.random() - 0.5) * 0.3)),
-      }))
-      setLastUpdate(new Date())
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error loading real-time metrics.</div>;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

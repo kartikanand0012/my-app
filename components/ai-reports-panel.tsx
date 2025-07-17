@@ -9,69 +9,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Bot, Send, MessageSquare, TrendingUp, AlertCircle, CheckCircle, Clock } from "lucide-react"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchRecentReports, fetchAIInsights } from "../lib/services/aiReportsPanelApi";
 
 interface AIReportsPanelProps {
   userRole: "admin" | "team-lead" | "employee"
 }
 
-const recentReports = [
-  {
-    id: 1,
-    type: "Daily Performance",
-    recipient: "Sarah Wilson",
-    status: "sent",
-    timestamp: "2024-01-15 09:00",
-    summary: "Great performance today! 52 calls completed with 96.8% success rate.",
-    improvements: ["Consider reducing average call duration by 30 seconds", "Focus on document quality checks"],
-  },
-  {
-    id: 2,
-    type: "Weekly Summary",
-    recipient: "Mike Johnson",
-    status: "scheduled",
-    timestamp: "2024-01-15 17:00",
-    summary: "Weekly performance shows consistent improvement in success rates.",
-    improvements: ["Work on network connectivity error handling", "Review identity verification procedures"],
-  },
-  {
-    id: 3,
-    type: "Error Alert",
-    recipient: "Emily Chen",
-    status: "sent",
-    timestamp: "2024-01-15 14:30",
-    summary: "Increased error rate detected in afternoon sessions.",
-    improvements: ["Take a short break to maintain focus", "Review document quality checklist"],
-  },
-]
-
-const aiInsights = [
-  {
-    type: "Performance Trend",
-    message: "Your success rate has improved by 2.3% this week. Keep up the excellent work!",
-    priority: "positive",
-    actionable: true,
-  },
-  {
-    type: "Error Pattern",
-    message: "Document quality issues tend to increase after 3 PM. Consider implementing quality checks.',",
-    priority: "warning",
-    actionable: true,
-  },
-  {
-    type: "Efficiency Tip",
-    message: "Your average call duration is optimal. This contributes to higher productivity scores.",
-    priority: "info",
-    actionable: false,
-  },
-]
-
 export function AIReportsPanel({ userRole }: AIReportsPanelProps) {
-  const [selectedEmployee, setSelectedEmployee] = useState("all")
-  const [reportType, setReportType] = useState("daily")
-  const [autoReports, setAutoReports] = useState(true)
-  const [slackNotifications, setSlackNotifications] = useState(true)
-  const [customMessage, setCustomMessage] = useState("")
-  const [isGenerating, setIsGenerating] = useState(false)
+  const { data: recentReports, loading: loadingReports, error: errorReports } = useMockApi(fetchRecentReports);
+  const { data: aiInsights, loading: loadingInsights, error: errorInsights } = useMockApi(fetchAIInsights);
+  const [selectedEmployee, setSelectedEmployee] = useState("all");
+  const [reportType, setReportType] = useState("daily");
+  const [autoReports, setAutoReports] = useState(true);
+  const [slackNotifications, setSlackNotifications] = useState(true);
+  const [customMessage, setCustomMessage] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  if (loadingReports || loadingInsights) return <div>Loading...</div>;
+  if (errorReports || errorInsights) return <div>Error loading AI reports panel data.</div>;
 
   const handleGenerateReport = async () => {
     setIsGenerating(true)
@@ -177,7 +133,7 @@ export function AIReportsPanel({ userRole }: AIReportsPanelProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {aiInsights.map((insight, index) => (
+            {aiInsights?.map((insight, index) => (
               <div key={index} className="flex items-start space-x-3 p-4 border rounded-lg">
                 <div className="flex-shrink-0">
                   {insight.priority === "positive" && <CheckCircle className="w-5 h-5 text-green-600" />}
@@ -224,7 +180,7 @@ export function AIReportsPanel({ userRole }: AIReportsPanelProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {recentReports.map((report) => (
+            {recentReports?.map((report) => (
               <div key={report.id} className="border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">

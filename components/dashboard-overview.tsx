@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -27,45 +28,30 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import { fetchDashboardData } from "../lib/api";
 
 interface DashboardOverviewProps {
   userRole: "admin" | "team-lead" | "employee"
 }
 
 export function DashboardOverview({ userRole }: DashboardOverviewProps) {
-  // Sample data for charts
-  const performanceData = [
-    { name: "Mon", calls: 45, success: 89, errors: 3 },
-    { name: "Tue", calls: 52, success: 92, errors: 2 },
-    { name: "Wed", calls: 48, success: 87, errors: 4 },
-    { name: "Thu", calls: 51, success: 94, errors: 1 },
-    { name: "Fri", calls: 47, success: 89, errors: 3 },
-  ]
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const errorDistribution = [
-    { name: "Document Quality", value: 35, color: "#ef4444" },
-    { name: "Network Issues", value: 28, color: "#f59e0b" },
-    { name: "Identity Verification", value: 22, color: "#3b82f6" },
-    { name: "System Timeout", value: 15, color: "#10b981" },
-  ]
+  useEffect(() => {
+    fetchDashboardData().then((data) => {
+      setDashboardData(data);
+      setLoading(false);
+    });
+  }, []);
 
-  const teamStats = {
-    totalAgents: 25,
-    activeAgents: 23,
-    totalCalls: 1247,
-    successRate: 91.2,
-    totalErrors: 47,
-    avgCallDuration: 8.5,
-  }
+  if (loading || !dashboardData) return <div>Loading...</div>;
 
-  const agentStats = {
-    callsToday: 47,
-    successRate: 89.4,
-    errorsToday: 3,
-    avgDuration: 8.2,
-    rank: 4,
-    activeHours: 7.5,
-  }
+  // Replace static data with data from dashboardData
+  const performanceData = dashboardData.performanceData || [];
+  const errorDistribution = dashboardData.errorDistribution || [];
+  const teamStats = dashboardData.teamStats || {};
+  const agentStats = dashboardData.agentStats || {};
 
   return (
     <div className="space-y-6">

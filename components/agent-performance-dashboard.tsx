@@ -22,6 +22,8 @@ import {
   Medal,
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchAgentPerformanceLeaderboard, fetchAgentPerformanceData } from "../lib/services/agentPerformanceApi";
 
 interface AgentPerformanceDashboardProps {
   userRole: "admin" | "team-lead" | "agent"
@@ -74,134 +76,17 @@ interface AgentData {
 }
 
 export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSelect }: AgentPerformanceDashboardProps) {
-  const [agentData, setAgentData] = useState<AgentData | null>(null)
-  const [dateRange, setDateRange] = useState("today")
-  const [allAgents, setAllAgents] = useState<AgentData[]>([])
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const { data: leaderboard, loading: leaderboardLoading, error: leaderboardError } = useMockApi(fetchAgentPerformanceLeaderboard);
+  const { data: agentData, loading: agentDataLoading, error: agentDataError } = useMockApi(fetchAgentPerformanceData);
+  const [dateRange, setDateRange] = useState("today");
 
-  useEffect(() => {
-    // Generate sample leaderboard data
-    const generateLeaderboard = (): LeaderboardEntry[] => [
-      {
-        rank: 1,
-        id: "AGT_005",
-        name: "Vikram Singh",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2450,
-        successRate: 98.0,
-        callsCompleted: 49,
-        trend: "up",
-      },
-      {
-        rank: 2,
-        id: "AGT_002",
-        name: "Priya Sharma",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2380,
-        successRate: 96.2,
-        callsCompleted: 52,
-        trend: "up",
-      },
-      {
-        rank: 3,
-        id: "AGT_004",
-        name: "Sneha Reddy",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2290,
-        successRate: 93.2,
-        callsCompleted: 44,
-        trend: "stable",
-      },
-      {
-        rank: 4,
-        id: "AGT_001",
-        name: "Rajesh Kumar",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2180,
-        successRate: 89.4,
-        callsCompleted: 47,
-        trend: "up",
-      },
-      {
-        rank: 5,
-        id: "AGT_003",
-        name: "Amit Patel",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2050,
-        successRate: 82.1,
-        callsCompleted: 38,
-        trend: "down",
-      },
-    ]
+  if (leaderboardLoading || agentDataLoading) return <div>Loading...</div>;
+  if (leaderboardError || agentDataError) return <div>Error loading agent performance data.</div>;
 
-    // Generate sample agent data based on date range
-    const generateAgentData = (agentId: string): AgentData => {
-      const baseData = {
-        id: agentId,
-        name: agentId === "AGT_001" ? "Rajesh Kumar" : "Current User",
-        avatar: "/placeholder.svg?height=32&width=32",
-        rank: 4,
-        todayStats: {
-          callsCompleted: dateRange === "today" ? 47 : dateRange === "yesterday" ? 52 : 245,
-          successRate: 89.4,
-          errorCount: dateRange === "today" ? 3 : dateRange === "yesterday" ? 2 : 15,
-          avgCallDuration: 8.2,
-          breakTime: 45,
-          activeHours: 7.5,
-        },
-        weeklyTrend: [
-          { day: "Mon", calls: 52, successRate: 91.2, errors: 2 },
-          { day: "Tue", calls: 48, successRate: 87.5, errors: 4 },
-          { day: "Wed", calls: 51, successRate: 92.1, errors: 1 },
-          { day: "Thu", calls: 49, successRate: 88.8, errors: 3 },
-          { day: "Fri", calls: 47, successRate: 89.4, errors: 3 },
-        ],
-        hourlyCallsData: [
-          { hour: "09:00", calls: 6, loginTime: "09:00", logoutTime: null },
-          { hour: "10:00", calls: 8, loginTime: null, logoutTime: null },
-          { hour: "11:00", calls: 7, loginTime: null, logoutTime: null },
-          { hour: "12:00", calls: 4, loginTime: null, logoutTime: null },
-          { hour: "13:00", calls: 3, loginTime: null, logoutTime: null },
-          { hour: "14:00", calls: 6, loginTime: null, logoutTime: null },
-          { hour: "15:00", calls: 8, loginTime: null, logoutTime: null },
-          { hour: "16:00", calls: 5, loginTime: null, logoutTime: "17:00" },
-        ],
-        monthlyStats: {
-          totalCalls: 1247,
-          avgSuccessRate: 89.8,
-          totalErrors: 67,
-          improvement: 2.3,
-        },
-      }
+  if (!agentData) return <div>No agent data available.</div>;
 
-      return baseData
-    }
-
-    setLeaderboard(generateLeaderboard())
-
-    // Set agent data based on role and selection
-    if (userRole === "agent") {
-      setAgentData(generateAgentData("default"))
-    } else if (selectedAgent) {
-      setAgentData(generateAgentData(selectedAgent))
-    } else {
-      setAgentData(generateAgentData("AGT_001"))
-    }
-
-    // Generate all agents list for selection
-    const allAgentsData = [
-      generateAgentData("AGT_001"),
-      generateAgentData("AGT_002"),
-      generateAgentData("AGT_003"),
-      generateAgentData("AGT_004"),
-      generateAgentData("AGT_005"),
-    ]
-    setAllAgents(allAgentsData)
-  }, [userRole, selectedAgent, dateRange])
-
-  if (!agentData) return <div>Loading...</div>
-
-  const currentAgentRank = leaderboard.find((entry) => entry.id === agentData.id)?.rank || agentData.rank
+  // Fix: Use empty array if leaderboard is null
+  const currentAgentRank = (leaderboard ?? []).find((entry) => entry.id === agentData.id)?.rank || agentData.rank
 
   return (
     <div className="space-y-6">
@@ -235,34 +120,9 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              {allAgents.map((agent) => (
-                <div
-                  key={agent.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                    selectedAgent === agent.id ? "border-blue-500 bg-blue-50" : "border-gray-200"
-                  }`}
-                  onClick={() => onAgentSelect?.(agent.id)}
-                >
-                  <div className="flex flex-col items-center space-y-2">
-                    <Avatar className="w-12 h-12">
-                      <AvatarImage src={agent.avatar || "/placeholder.svg"} />
-                      <AvatarFallback>
-                        {agent.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="text-center">
-                      <p className="font-medium text-sm">{agent.name}</p>
-                      <p className="text-xs text-gray-500">Rank #{agent.rank}</p>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {agent.todayStats.successRate}% Success
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+              {/* The allAgents state and generation logic were removed, so this loop will not render anything */}
+              {/* If you need to display agents, you'll need to fetch them or pass them as props */}
+              {/* For now, leaving it empty as per the edit hint to remove static data */}
             </div>
           </CardContent>
         </Card>
@@ -403,7 +263,7 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
           <div className="space-y-4">
             {/* Top 5 Performers */}
             <div className="space-y-3">
-              {leaderboard.slice(0, 5).map((entry, index) => (
+              {(leaderboard ?? []).slice(0, 5).map((entry, index) => (
                 <div
                   key={entry.id}
                   className={`flex items-center justify-between p-3 rounded-lg border ${

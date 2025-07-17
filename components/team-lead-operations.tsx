@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +27,8 @@ import {
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { format } from "date-fns"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchTeamMembers } from "../lib/services/teamLeadOperationsApi";
 
 interface TeamLeadOperationsProps {
   userRole: "admin" | "team-lead"
@@ -50,94 +52,15 @@ interface TeamMember {
 }
 
 export function TeamLeadOperations({ userRole, onAgentSelect }: TeamLeadOperationsProps) {
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const { data: teamMembers, loading, error } = useMockApi(fetchTeamMembers);
   const [selectedTeam, setSelectedTeam] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [errorTypeFilter, setErrorTypeFilter] = useState("all")
   const [dateFrom, setDateFrom] = useState<Date>()
   const [dateTo, setDateTo] = useState<Date>()
 
-  useEffect(() => {
-    // Generate sample team data
-    const generateTeamData = (): TeamMember[] => [
-      {
-        id: "AGT_001",
-        uuid: "AGT-550e8400-e29b-41d4-a716-446655440001",
-        name: "Rajesh Kumar",
-        avatar: "/placeholder.svg?height=32&width=32",
-        status: "active",
-        todayErrors: 3,
-        errorTypes: ["Document Quality", "Network Issue"],
-        callsToday: 47,
-        successRate: 89.4,
-        lastError: "Document quality issue at 14:30",
-        videoRecordingId: "VID_001_20240115_1430",
-        shift: "Morning",
-        team: "Team A",
-      },
-      {
-        id: "AGT_002",
-        uuid: "AGT-550e8400-e29b-41d4-a716-446655440002",
-        name: "Priya Sharma",
-        avatar: "/placeholder.svg?height=32&width=32",
-        status: "break",
-        todayErrors: 1,
-        errorTypes: ["Identity Verification"],
-        callsToday: 52,
-        successRate: 96.2,
-        lastError: "Identity verification failed at 13:15",
-        videoRecordingId: "VID_002_20240115_1315",
-        shift: "Morning",
-        team: "Team A",
-      },
-      {
-        id: "AGT_003",
-        uuid: "AGT-550e8400-e29b-41d4-a716-446655440003",
-        name: "Amit Patel",
-        avatar: "/placeholder.svg?height=32&width=32",
-        status: "active",
-        todayErrors: 5,
-        errorTypes: ["Document Quality", "System Timeout", "Audio Issue"],
-        callsToday: 38,
-        successRate: 82.1,
-        lastError: "System timeout during verification at 15:45",
-        videoRecordingId: "VID_003_20240115_1545",
-        shift: "Morning",
-        team: "Team B",
-      },
-      {
-        id: "AGT_004",
-        uuid: "AGT-550e8400-e29b-41d4-a716-446655440004",
-        name: "Sneha Reddy",
-        avatar: "/placeholder.svg?height=32&width=32",
-        status: "active",
-        todayErrors: 2,
-        errorTypes: ["Network Issue"],
-        callsToday: 44,
-        successRate: 93.2,
-        lastError: "Network connectivity issue at 15:20",
-        videoRecordingId: "VID_004_20240115_1520",
-        shift: "Afternoon",
-        team: "Team B",
-      },
-      {
-        id: "AGT_005",
-        uuid: "AGT-550e8400-e29b-41d4-a716-446655440005",
-        name: "Vikram Singh",
-        avatar: "/placeholder.svg?height=32&width=32",
-        status: "active",
-        todayErrors: 0,
-        errorTypes: [],
-        callsToday: 49,
-        successRate: 98.0,
-        lastError: "No errors today",
-        shift: "Afternoon",
-        team: "Team A",
-      },
-    ]
-
-    setTeamMembers(generateTeamData())
-  }, [])
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error loading team members.</div>;
 
   const handleVideoAccess = (videoId: string, agentName: string) => {
     console.log(`Accessing video recording: ${videoId} for ${agentName}`)

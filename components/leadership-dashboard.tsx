@@ -21,6 +21,8 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchLeadershipAgents } from "../lib/services/leadershipDashboardApi";
 
 interface Agent {
   id: string
@@ -82,122 +84,43 @@ const TIER_CONFIG = {
 }
 
 export function LeadershipDashboard({ onAgentSelect }: LeadershipDashboardProps) {
-  const [allAgents, setAllAgents] = useState<Agent[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
-  const [isMeetingModalOpen, setMeetingModalOpen] = useState(false)
-  const [selectedTierForMeeting, setSelectedTierForMeeting] = useState<Tier | null>(null)
-  const [dateRange, setDateRange] = useState("all_time")
-  const [customDateFrom, setCustomDateFrom] = useState<Date>()
-  const [customDateTo, setCustomDateTo] = useState<Date>()
+  const { data: allAgents = [], loading, error } = useMockApi(fetchLeadershipAgents);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [isMeetingModalOpen, setMeetingModalOpen] = useState(false);
+  const [selectedTierForMeeting, setSelectedTierForMeeting] = useState<Tier | null>(null);
+  const [dateRange, setDateRange] = useState("all_time");
+  const [customDateFrom, setCustomDateFrom] = useState<Date>();
+  const [customDateTo, setCustomDateTo] = useState<Date>();
 
-  useEffect(() => {
-    // Generate a larger set of sample agents with date-based performance
-    const generateAgentsForDateRange = (): Agent[] => {
-      const baseAgents = Array.from({ length: 80 }).map((_, i) => {
-        const names = [
-          "Vikram Singh",
-          "Priya Sharma",
-          "Rajesh Kumar",
-          "Sneha Reddy",
-          "Amit Patel",
-          "Kavya Nair",
-          "Arjun Mehta",
-          "Deepika Singh",
-          "Rohit Sharma",
-          "Ananya Das",
-        ]
-        const name = names[i % names.length]
-        const fullName = `${name} ${i >= names.length ? Math.floor(i / names.length) + 1 : ""}`.trim()
-
-        // Generate performance data based on selected date range
-        let performanceMultiplier = 1
-        let callsMultiplier = 1
-
-        switch (dateRange) {
-          case "last_week":
-            performanceMultiplier = 0.2
-            callsMultiplier = 0.2
-            break
-          case "last_month":
-            performanceMultiplier = 0.8
-            callsMultiplier = 0.8
-            break
-          case "last_3_months":
-            performanceMultiplier = 2.5
-            callsMultiplier = 2.5
-            break
-          case "last_year":
-            performanceMultiplier = 10
-            callsMultiplier = 10
-            break
-          case "custom":
-            if (customDateFrom && customDateTo) {
-              const daysDiff = Math.abs((customDateTo.getTime() - customDateFrom.getTime()) / (1000 * 60 * 60 * 24))
-              performanceMultiplier = daysDiff / 30 // Normalize to monthly
-              callsMultiplier = daysDiff / 30
-            }
-            break
-          default:
-            performanceMultiplier = 12 // All time (yearly)
-            callsMultiplier = 12
-        }
-
-        return {
-          id: `AGT_${(i + 1).toString().padStart(3, "0")}`,
-          uuid: `f${(Math.random() + 1).toString(36).substring(2)}-${(Math.random() + 1).toString(36).substring(2)}-${(Math.random() + 1).toString(36).substring(2)}`,
-          name: fullName,
-          email: `${name.split(" ").join(".").toLowerCase()}${i >= names.length ? Math.floor(i / names.length) + 1 : ""}@vykc.co`,
-          avatar: `/placeholder.svg?height=64&width=64&query=${name.split(" ")[0]}`,
-          rank: i + 1,
-          score: Math.round((2500 - i * 23.5) * performanceMultiplier),
-          monthlyStats: {
-            totalCalls: Math.round((1400 - i * 15) * callsMultiplier),
-            successRate: Math.max(75, 98 - i * 0.4),
-            errorRate: Math.min(25, 2 + i * 0.4),
-            customerRating: Math.max(3.5, 4.9 - i * 0.02),
-            improvement: Math.max(-10, 5 - i * 0.05),
-          },
-          team: ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"][i % 5],
-          location: ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai"][i % 5],
-        }
-      })
-
-      // Sort by score for proper ranking
-      return baseAgents
-        .sort((a, b) => b.score - a.score)
-        .map((agent, index) => ({
-          ...agent,
-          rank: index + 1,
-        }))
-    }
-
-    setAllAgents(generateAgentsForDateRange())
-  }, [dateRange, customDateFrom, customDateTo])
-
+  // All hooks must be called before any return!
   const filteredAgents = useMemo(() => {
-    if (!searchQuery) return allAgents
-    return allAgents.filter(
+    if (!searchQuery) return allAgents || [];
+    return (allAgents || []).filter(
       (agent) =>
         agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         agent.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         agent.uuid.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-  }, [allAgents, searchQuery])
+    );
+  }, [allAgents, searchQuery]);
 
   const agentTiers = useMemo((): Tier[] => {
-    const elite = filteredAgents.filter((a) => a.rank >= 1 && a.rank <= 10)
-    const challengers = filteredAgents.filter((a) => a.rank >= 11 && a.rank <= 30)
-    const growers = filteredAgents.filter((a) => a.rank >= 31 && a.rank <= 60)
-    const foundation = filteredAgents.filter((a) => a.rank > 60)
+    const elite = filteredAgents.filter((a) => a.rank >= 1 && a.rank <= 10);
+    const challengers = filteredAgents.filter((a) => a.rank >= 11 && a.rank <= 30);
+    const growers = filteredAgents.filter((a) => a.rank >= 31 && a.rank <= 60);
+    const foundation = filteredAgents.filter((a) => a.rank > 60);
 
     return [
       { ...TIER_CONFIG.elite, range: "Top 1-10", agents: elite },
       { ...TIER_CONFIG.challengers, range: "Top 11-30", agents: challengers },
       { ...TIER_CONFIG.growers, range: "Top 31-60", agents: growers },
       { ...TIER_CONFIG.foundation, range: "61+", agents: foundation },
-    ].filter((tier) => tier.agents.length > 0)
-  }, [filteredAgents])
+    ].filter((tier) => tier.agents.length > 0);
+  }, [filteredAgents]);
+
+  // Only now, after all hooks, do the early return:
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error loading leadership agents.</div>;
 
   const openMeetingScheduler = (tier: Tier) => {
     setSelectedTierForMeeting(tier)
@@ -323,8 +246,8 @@ export function LeadershipDashboard({ onAgentSelect }: LeadershipDashboardProps)
           <Accordion type="multiple" defaultValue={["The Elite"]} className="w-full space-y-4">
             {agentTiers.map((tier) => (
               <AccordionItem value={tier.name} key={tier.name} className="border rounded-lg bg-background/50">
-                <AccordionTrigger className="p-4 hover:no-underline rounded-t-lg data-[state=open]:bg-muted/50">
-                  <div className="flex items-center justify-between w-full">
+                <div className="flex items-center justify-between w-full">
+                  <AccordionTrigger className="flex-1 p-4 hover:no-underline rounded-t-lg data-[state=open]:bg-muted/50">
                     <div className="flex items-center gap-4">
                       <tier.icon className={`w-8 h-8 ${tier.color}`} />
                       <div>
@@ -332,24 +255,20 @@ export function LeadershipDashboard({ onAgentSelect }: LeadershipDashboardProps)
                         <p className="text-sm text-muted-foreground text-left">{tier.description}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <Badge variant="secondary" className="text-lg px-4 py-2">
-                        {tier.agents.length} Agents
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openMeetingScheduler(tier)
-                        }}
-                      >
-                        <CalendarIcon className="w-4 h-4 mr-2" />
-                        Schedule Training
-                      </Button>
-                    </div>
-                  </div>
-                </AccordionTrigger>
+                    <Badge variant="secondary" className="text-lg px-4 py-2">
+                      {tier.agents.length} Agents
+                    </Badge>
+                  </AccordionTrigger>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="m-4"
+                    onClick={() => openMeetingScheduler(tier)}
+                  >
+                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    Schedule Training
+                  </Button>
+                </div>
                 <AccordionContent className="p-4 border-t">
                   {tier.agents.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">

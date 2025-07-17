@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Users, Clock, Phone, Activity, AlertTriangle, CheckCircle, Eye } from "lucide-react"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchAgentStatusList } from "../lib/services/agentStatusApi";
 
 interface AgentStatus {
   id: string
@@ -33,134 +35,13 @@ interface AgentStatus {
 }
 
 export function AgentStatusTracker() {
-  const [agents, setAgents] = useState<AgentStatus[]>([])
+  const { data: agents, loading, error } = useMockApi(fetchAgentStatusList);
   const [filterShift, setFilterShift] = useState<string>("all")
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [lastUpdate, setLastUpdate] = useState(new Date())
 
-  useEffect(() => {
-    const generateAgentData = (): AgentStatus[] => [
-      {
-        id: "AGT_001",
-        name: "Rajesh Kumar",
-        employeeId: "EMP001",
-        avatar: "/placeholder.svg?height=32&width=32",
-        currentStatus: "break",
-        shift: "morning",
-        loginTime: "09:00:00",
-        totalBreakTime: 45,
-        currentBreakStart: "15:30:00",
-        callsToday: 12,
-        callsInProgress: 0,
-        avgCallDuration: 8.5,
-        approvalRate: 89,
-        rejectionRate: 11,
-        lastActivity: "15:29:45",
-        flagCount: 2,
-        engagementScore: 72,
-        location: "Mumbai",
-        workstation: "WS-001",
-      },
-      {
-        id: "AGT_002",
-        name: "Priya Sharma",
-        employeeId: "EMP002",
-        avatar: "/placeholder.svg?height=32&width=32",
-        currentStatus: "active",
-        shift: "morning",
-        loginTime: "09:00:00",
-        totalBreakTime: 15,
-        callsToday: 0,
-        callsInProgress: 0,
-        avgCallDuration: 0,
-        approvalRate: 0,
-        rejectionRate: 0,
-        lastActivity: "14:30:00",
-        flagCount: 1,
-        engagementScore: 25,
-        location: "Delhi",
-        workstation: "WS-002",
-      },
-      {
-        id: "AGT_003",
-        name: "Amit Patel",
-        employeeId: "EMP003",
-        avatar: "/placeholder.svg?height=32&width=32",
-        currentStatus: "in_call",
-        shift: "morning",
-        loginTime: "09:00:00",
-        totalBreakTime: 25,
-        callsToday: 18,
-        callsInProgress: 1,
-        avgCallDuration: 7.2,
-        approvalRate: 92,
-        rejectionRate: 8,
-        lastActivity: "15:50:00",
-        flagCount: 0,
-        engagementScore: 88,
-        location: "Bangalore",
-        workstation: "WS-003",
-      },
-      {
-        id: "AGT_004",
-        name: "Sneha Reddy",
-        employeeId: "EMP004",
-        avatar: "/placeholder.svg?height=32&width=32",
-        currentStatus: "active",
-        shift: "morning",
-        loginTime: "09:00:00",
-        totalBreakTime: 20,
-        callsToday: 15,
-        callsInProgress: 0,
-        avgCallDuration: 9.1,
-        approvalRate: 78,
-        rejectionRate: 22,
-        lastActivity: "15:48:00",
-        flagCount: 1,
-        engagementScore: 65,
-        location: "Hyderabad",
-        workstation: "WS-004",
-      },
-      {
-        id: "AGT_005",
-        name: "Vikram Singh",
-        employeeId: "EMP005",
-        avatar: "/placeholder.svg?height=32&width=32",
-        currentStatus: "active",
-        shift: "afternoon",
-        loginTime: "13:00:00",
-        totalBreakTime: 10,
-        callsToday: 22,
-        callsInProgress: 0,
-        avgCallDuration: 6.8,
-        approvalRate: 94,
-        rejectionRate: 6,
-        lastActivity: "15:52:00",
-        flagCount: 0,
-        engagementScore: 95,
-        location: "Chennai",
-        workstation: "WS-005",
-      },
-    ]
-
-    setAgents(generateAgentData())
-
-    // Simulate real-time updates
-    const interval = setInterval(() => {
-      setLastUpdate(new Date())
-      setAgents((prev) =>
-        prev.map((agent) => ({
-          ...agent,
-          lastActivity: new Date().toLocaleTimeString(),
-          // Simulate some random updates
-          callsToday: agent.callsToday + (Math.random() > 0.8 ? 1 : 0),
-          totalBreakTime: agent.totalBreakTime + (Math.random() > 0.9 ? 1 : 0),
-        })),
-      )
-    }, 10000)
-
-    return () => clearInterval(interval)
-  }, [])
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error loading agent status.</div>;
 
   const getStatusColor = (status: string) => {
     switch (status) {

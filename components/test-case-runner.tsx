@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { CheckCircle, XCircle, Clock, Play, RotateCcw, AlertTriangle } from "lucide-react"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchTestCases } from "../lib/services/testCaseRunnerApi";
 
 interface TestCase {
   id: string
@@ -27,112 +29,13 @@ interface TestCaseRunnerProps {
 }
 
 export function TestCaseRunner({ onTestResults }: TestCaseRunnerProps) {
-  const [testCases, setTestCases] = useState<TestCase[]>([
-    {
-      id: "TC_001",
-      name: "Break Duration Detection",
-      description: "Verify AI correctly identifies agents with excessive break time",
-      category: "ai_detection",
-      status: "pending",
-      expectedResult: {
-        flagGenerated: true,
-        flagType: "break_duration",
-        confidence: ">= 80",
-        agentId: "AGT_001",
-      },
-    },
-    {
-      id: "TC_002",
-      name: "Non-Engagement Detection",
-      description: "Test detection of agents not handling calls during high flow",
-      category: "ai_detection",
-      status: "pending",
-      expectedResult: {
-        flagGenerated: true,
-        flagType: "non_engagement",
-        confidence: ">= 85",
-        agentId: "AGT_002",
-      },
-    },
-    {
-      id: "TC_003",
-      name: "Performance Decline Detection",
-      description: "Verify detection of declining approval rates",
-      category: "ai_detection",
-      status: "pending",
-      expectedResult: {
-        flagGenerated: true,
-        flagType: "performance_decline",
-        confidence: ">= 80",
-        agentId: "AGT_004",
-      },
-    },
-    {
-      id: "TC_004",
-      name: "Data Accuracy Validation",
-      description: "Validate all displayed metrics match source data",
-      category: "data_validation",
-      status: "pending",
-      expectedResult: {
-        dataConsistency: true,
-        metricsAccuracy: ">= 99%",
-        calculationErrors: 0,
-      },
-    },
-    {
-      id: "TC_005",
-      name: "Real-time Updates",
-      description: "Test real-time data refresh and synchronization",
-      category: "performance",
-      status: "pending",
-      expectedResult: {
-        updateLatency: "<= 5s",
-        dataSync: true,
-        uiRefresh: true,
-      },
-    },
-    {
-      id: "TC_006",
-      name: "Flag Management System",
-      description: "Test flag creation, updating, and resolution workflow",
-      category: "integration",
-      status: "pending",
-      expectedResult: {
-        flagCreation: true,
-        statusUpdate: true,
-        resolution: true,
-        notification: true,
-      },
-    },
-    {
-      id: "TC_007",
-      name: "Agent Status Tracking",
-      description: "Verify accurate tracking of agent status changes",
-      category: "data_validation",
-      status: "pending",
-      expectedResult: {
-        statusAccuracy: true,
-        timestampCorrect: true,
-        transitionLogged: true,
-      },
-    },
-    {
-      id: "TC_008",
-      name: "System Performance",
-      description: "Test system performance under normal load",
-      category: "performance",
-      status: "pending",
-      expectedResult: {
-        responseTime: "<= 2s",
-        memoryUsage: "<= 80%",
-        cpuUsage: "<= 70%",
-      },
-    },
-  ])
-
+  const { data: testCases, loading, error } = useMockApi(fetchTestCases);
   const [isRunning, setIsRunning] = useState(false)
   const [currentTest, setCurrentTest] = useState<string | null>(null)
   const [overallProgress, setOverallProgress] = useState(0)
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error loading test cases.</div>;
 
   const runSingleTest = async (testId: string): Promise<TestCase> => {
     const test = testCases.find((t) => t.id === testId)!
@@ -142,7 +45,7 @@ export function TestCaseRunner({ onTestResults }: TestCaseRunnerProps) {
     const startTime = Date.now()
 
     // Update test status to running
-    setTestCases((prev) => prev.map((t) => (t.id === testId ? { ...t, status: "running" } : t)))
+    // setTestCases((prev) => prev.map((t) => (t.id === testId ? { ...t, status: "running" } : t))) // This line is removed
 
     // Simulate different test execution times
     const executionTime = Math.random() * 3000 + 1000 // 1-4 seconds
@@ -288,7 +191,7 @@ export function TestCaseRunner({ onTestResults }: TestCaseRunnerProps) {
       results.push(result)
 
       // Update test cases with result
-      setTestCases((prev) => prev.map((t) => (t.id === testCase.id ? result : t)))
+      // setTestCases((prev) => prev.map((t) => (t.id === testCase.id ? result : t))) // This line is removed
 
       // Update progress
       setOverallProgress(((i + 1) / testCases.length) * 100)
@@ -299,16 +202,16 @@ export function TestCaseRunner({ onTestResults }: TestCaseRunnerProps) {
   }
 
   const resetTests = () => {
-    setTestCases((prev) =>
-      prev.map((test) => ({
-        ...test,
-        status: "pending",
-        duration: undefined,
-        result: undefined,
-        error: undefined,
-        actualResult: undefined,
-      })),
-    )
+    // setTestCases((prev) => // This line is removed
+    //   prev.map((test) => ({
+    //     ...test,
+    //     status: "pending",
+    //     duration: undefined,
+    //     result: undefined,
+    //     error: undefined,
+    //     actualResult: undefined,
+    //   })),
+    // )
     setOverallProgress(0)
     setCurrentTest(null)
   }

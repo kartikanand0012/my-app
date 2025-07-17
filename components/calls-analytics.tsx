@@ -8,51 +8,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Phone, PhoneCall, PhoneOff, Clock, TrendingUp, TrendingDown, Users, Calendar, Download } from "lucide-react"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from "recharts"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchCallVolumeData, fetchCallDurationData, fetchCallOutcomeData, fetchCallStats } from "../lib/services/callsAnalyticsApi";
 
 interface CallsAnalyticsProps {
   userRole: "admin" | "team-lead" | "employee"
 }
 
 export function CallsAnalytics({ userRole }: CallsAnalyticsProps) {
-  const [timeRange, setTimeRange] = useState("today")
-  const [filterType, setFilterType] = useState("all")
+  const { data: callVolumeData, loading: loadingVolume, error: errorVolume } = useMockApi(fetchCallVolumeData);
+  const { data: callDurationData, loading: loadingDuration, error: errorDuration } = useMockApi(fetchCallDurationData);
+  const { data: callOutcomeData, loading: loadingOutcome, error: errorOutcome } = useMockApi(fetchCallOutcomeData);
+  const { data: callStats, loading: loadingStats, error: errorStats } = useMockApi(fetchCallStats);
+  const [timeRange, setTimeRange] = useState("today");
+  const [filterType, setFilterType] = useState("all");
 
-  // Sample data
-  const callVolumeData = [
-    { time: "09:00", calls: 45, successful: 42, failed: 3 },
-    { time: "10:00", calls: 52, successful: 48, failed: 4 },
-    { time: "11:00", calls: 48, successful: 46, failed: 2 },
-    { time: "12:00", calls: 38, successful: 35, failed: 3 },
-    { time: "13:00", calls: 44, successful: 41, failed: 3 },
-    { time: "14:00", calls: 49, successful: 45, failed: 4 },
-    { time: "15:00", calls: 51, successful: 47, failed: 4 },
-    { time: "16:00", calls: 46, successful: 44, failed: 2 },
-  ]
-
-  const callDurationData = [
-    { agent: "Agent 1", avgDuration: 8.2, calls: 47 },
-    { agent: "Agent 2", avgDuration: 7.8, calls: 52 },
-    { agent: "Agent 3", avgDuration: 9.1, calls: 38 },
-    { agent: "Agent 4", avgDuration: 7.5, calls: 44 },
-    { agent: "Agent 5", avgDuration: 8.7, calls: 49 },
-  ]
-
-  const callOutcomeData = [
-    { day: "Mon", successful: 89, failed: 11 },
-    { day: "Tue", successful: 92, failed: 8 },
-    { day: "Wed", successful: 87, failed: 13 },
-    { day: "Thu", successful: 94, failed: 6 },
-    { day: "Fri", successful: 89, failed: 11 },
-  ]
-
-  const callStats = {
-    totalCalls: userRole === "employee" ? 47 : 1247,
-    successfulCalls: userRole === "employee" ? 42 : 1138,
-    failedCalls: userRole === "employee" ? 5 : 109,
-    avgDuration: userRole === "employee" ? 8.2 : 8.5,
-    peakHour: "10:00 AM",
-    successRate: userRole === "employee" ? 89.4 : 91.2,
-  }
+  if (loadingVolume || loadingDuration || loadingOutcome || loadingStats) return <div>Loading...</div>;
+  if (errorVolume || errorDuration || errorOutcome || errorStats) return <div>Error loading call analytics data.</div>;
 
   return (
     <div className="space-y-6">

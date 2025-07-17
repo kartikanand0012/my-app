@@ -38,6 +38,8 @@ import {
   Users,
   Calculator,
 } from "lucide-react"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchFlaggedCalls, fetchAgentNames } from "../lib/services/qualityCheckApi";
 
 interface FlaggedCall {
   callId: string
@@ -59,107 +61,25 @@ interface AgentCallData {
   totalCalls: number
 }
 
-const initialFlaggedCalls: FlaggedCall[] = [
-  {
-    callId: "VKYC_QC_001",
-    agentId: "AGT_005",
-    agentName: "Arjun Patel",
-    callDate: "2023-10-25",
-    videoUrl: "/placeholder.mp4",
-    flags: [
-      { type: "sop", description: "Did not state the full closing script.", timestamp: "04:15" },
-      { type: "body_language", description: "Not wearing ID card.", timestamp: "00:10" },
-    ],
-    status: "pending_review",
-  },
-  {
-    callId: "VKYC_QC_002",
-    agentId: "AGT_012",
-    agentName: "Diya Verma",
-    callDate: "2023-10-25",
-    videoUrl: "/placeholder.mp4",
-    flags: [{ type: "language", description: "Used unprofessional term 'yaar'.", timestamp: "02:30" }],
-    status: "pending_review",
-  },
-  {
-    callId: "VKYC_QC_003",
-    agentId: "AGT_008",
-    agentName: "Krishna Iyer",
-    callDate: "2023-10-24",
-    videoUrl: "/placeholder.mp4",
-    flags: [{ type: "body_language", description: "Agent was slouched during the call.", timestamp: "01:05" }],
-    status: "action_required",
-  },
-  {
-    callId: "VKYC_QC_004",
-    agentId: "AGT_021",
-    agentName: "Rohan Das",
-    callDate: "2023-10-23",
-    videoUrl: "/placeholder.mp4",
-    flags: [{ type: "sop", description: "Incorrectly verified a document.", timestamp: "03:40" }],
-    status: "reviewed_ok",
-  },
-  {
-    callId: "VKYC_QC_005",
-    agentId: "AGT_005",
-    agentName: "Arjun Patel",
-    callDate: "2023-10-22",
-    videoUrl: "/placeholder.mp4",
-    flags: [{ type: "language", description: "Interrupted the customer multiple times.", timestamp: "01:55" }],
-    status: "reviewed_ok",
-  },
-]
-
 const FLAG_TYPES = ["body_language", "language", "sop"] as const
 
-const agentNames = [
-  "Aarav Sharma",
-  "Vivaan Singh",
-  "Aditya Kumar",
-  "Vihaan Gupta",
-  "Arjun Patel",
-  "Sai Reddy",
-  "Reyansh Joshi",
-  "Krishna Iyer",
-  "Ishaan Nair",
-  "Advik Menon",
-  "Ananya Rao",
-  "Diya Verma",
-  "Saanvi Agarwal",
-  "Aadhya Mishra",
-  "Myra Shah",
-  "Aarohi Desai",
-  "Kiara Pillai",
-  "Sitara Bhatt",
-  "Navya Chauhan",
-  "Pari Mehra",
-  "Rohan Das",
-  "Vikram Jain",
-  "Kabir Mehta",
-  "Zayn Ali",
-  "Aryan Kumar",
-  "Sanya Reddy",
-  "Tara Singh",
-  "Ira Gupta",
-  "Riya Patel",
-  "Aisha Sharma",
-]
-
 export function QualityCheckDashboard() {
-  const [flaggedCalls, setFlaggedCalls] = useState<FlaggedCall[]>(initialFlaggedCalls)
+  const { data: flaggedCalls, loading: flaggedCallsLoading, error: flaggedCallsError } = useMockApi(fetchFlaggedCalls);
+  const { data: agentNames, loading: agentNamesLoading, error: agentNamesError } = useMockApi(fetchAgentNames);
   const [selectedCall, setSelectedCall] = useState<FlaggedCall | null>(null)
   const [samplingPercentage, setSamplingPercentage] = useState(5)
   const [activeQueueTab, setActiveQueueTab] = useState("pending")
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedFlags, setSelectedFlags] = useState<string[]>([])
 
+  // Default agentNames to [] if null/undefined
   const agentCallData: AgentCallData[] = useMemo(() => {
-    return agentNames.map((name, index) => ({
+    return (agentNames ?? []).map((name, index) => ({
       agentId: `AGT_${String(index + 1).padStart(3, "0")}`,
       agentName: name,
       totalCalls: Math.floor(Math.random() * 51) + 200, // Random number between 200 and 250
     }))
-  }, [])
+  }, [agentNames])
 
   const totalCallsFromAgents = useMemo(
     () => agentCallData.reduce((sum, agent) => sum + agent.totalCalls, 0),
@@ -173,17 +93,17 @@ export function QualityCheckDashboard() {
   }, [agentCallData, samplingPercentage])
 
   const stats = useMemo(() => {
-    const totalFlagged = initialFlaggedCalls.length
-    const pendingReview = initialFlaggedCalls.filter(
+    const totalFlagged = flaggedCalls?.length || 0;
+    const pendingReview = flaggedCalls?.filter(
       (c) => c.status === "pending_review" || c.status === "action_required",
-    ).length
-    const reviewed = totalFlagged - pendingReview
+    ).length || 0;
+    const reviewed = totalFlagged - pendingReview;
     return { totalFlagged, pendingReview, reviewed }
-  }, [])
+  }, [flaggedCalls])
 
   const filteredCalls = useMemo(() => {
     return flaggedCalls
-      .filter((call) => {
+      ?.filter((call) => {
         if (searchTerm === "") return true
         const searchLower = searchTerm.toLowerCase()
         return (
@@ -198,8 +118,11 @@ export function QualityCheckDashboard() {
       })
   }, [flaggedCalls, searchTerm, selectedFlags])
 
-  const pendingCalls = filteredCalls.filter((c) => c.status === "pending_review" || c.status === "action_required")
-  const reviewedCalls = filteredCalls.filter((c) => c.status === "reviewed_ok")
+  const pendingCalls = filteredCalls?.filter((c) => c.status === "pending_review" || c.status === "action_required") || [];
+  const reviewedCalls = filteredCalls?.filter((c) => c.status === "reviewed_ok") || [];
+
+  if (flaggedCallsLoading || agentNamesLoading) return <div>Loading...</div>;
+  if (flaggedCallsError || agentNamesError) return <div>Error loading quality check data.</div>;
 
   const getFlagIcon = (type: "body_language" | "language" | "sop") => {
     if (type === "body_language") return <UserX className="w-4 h-4 text-orange-500" />
@@ -209,7 +132,7 @@ export function QualityCheckDashboard() {
   }
 
   const handleUpdateStatus = (callId: string, status: FlaggedCall["status"]) => {
-    setFlaggedCalls((prev) => prev.map((call) => (call.callId === callId ? { ...call, status } : call)))
+    // setFlaggedCalls((prev) => prev.map((call) => (call.callId === callId ? { ...call, status } : call)))
     setSelectedCall(null)
   }
 
@@ -491,10 +414,10 @@ function CallQueueTable({
                 <Badge
                   variant={
                     call.status === "pending_review"
-                      ? "warning"
+                      ? "secondary"
                       : call.status === "action_required"
                         ? "destructive"
-                        : "success"
+                        : "default"
                   }
                   className="capitalize"
                 >

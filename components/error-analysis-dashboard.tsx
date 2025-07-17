@@ -44,6 +44,8 @@ import {
   Cell,
 } from "recharts"
 import { format } from "date-fns"
+import { useMockApi } from "../lib/hooks/useMockApi";
+import { fetchErrorData, fetchSavedQueries, fetchScheduledReports } from "../lib/services/errorAnalysisDashboardApi";
 
 interface ErrorAnalysisDashboardProps {
   userRole: "admin" | "team-lead" | "agent"
@@ -86,176 +88,47 @@ interface ScheduledReport {
 }
 
 export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysisDashboardProps) {
-  const [dateFrom, setDateFrom] = useState<Date>()
-  const [dateTo, setDateTo] = useState<Date>()
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [typeFilter, setTypeFilter] = useState("all")
-  const [uuidFilter, setUuidFilter] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [errors, setErrors] = useState<ErrorData[]>([])
+  const { data: errors, loading: errorsLoading, error: errorsError } = useMockApi(fetchErrorData);
+  const { data: savedQueries, loading: queriesLoading, error: queriesError } = useMockApi(fetchSavedQueries);
+  const { data: scheduledReports, loading: reportsLoading, error: reportsError } = useMockApi(fetchScheduledReports);
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [uuidFilter, setUuidFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [aiQuery, setAiQuery] = useState("");
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [autoReportEnabled, setAutoReportEnabled] = useState(true);
+  const [customMessage, setCustomMessage] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("standard");
+  const [tagAllUsers, setTagAllUsers] = useState(false);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
 
-  // AI Reporting System States
-  const [aiQuery, setAiQuery] = useState("")
-  const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([])
-  const [scheduledReports, setScheduledReports] = useState<ScheduledReport[]>([])
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false)
-  const [autoReportEnabled, setAutoReportEnabled] = useState(true)
-  const [customMessage, setCustomMessage] = useState("")
-  const [selectedTemplate, setSelectedTemplate] = useState("standard")
-  const [tagAllUsers, setTagAllUsers] = useState(false)
-  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([])
-
-  useEffect(() => {
-    // Generate sample error data based on user role
-    const generateErrorData = (): ErrorData[] => {
-      const baseErrors = [
-        {
-          id: "ERR_001",
-          uuid: "550e8400-e29b-41d4-a716-446655440001",
-          agentId: "AGT_001",
-          agentName: "Rajesh Kumar",
-          type: "Document Quality",
-          date: "2024-01-15",
-          time: "14:30",
-          description: "Customer document was blurry, requested re-capture",
-          videoId: "VID_001_20240115_1430",
-          status: userRole === "agent" ? "approved" : "pending",
-        },
-        {
-          id: "ERR_002",
-          uuid: "550e8400-e29b-41d4-a716-446655440002",
-          agentId: "AGT_002",
-          agentName: "Priya Sharma",
-          type: "Network Issue",
-          date: "2024-01-15",
-          time: "13:15",
-          description: "Connection dropped during verification process",
-          videoId: "VID_002_20240115_1315",
-          status: "approved",
-          approvedBy: "Team Lead",
-          acknowledgedAt: "2024-01-15 13:45",
-        },
-        {
-          id: "ERR_003",
-          uuid: "550e8400-e29b-41d4-a716-446655440003",
-          agentId: "AGT_003",
-          agentName: "Amit Patel",
-          type: "System Timeout",
-          date: "2024-01-15",
-          time: "15:45",
-          description: "System timeout while processing biometric data",
-          videoId: "VID_003_20240115_1545",
-          status: userRole === "agent" ? "approved" : "pending",
-        },
-        {
-          id: "ERR_004",
-          uuid: "550e8400-e29b-41d4-a716-446655440004",
-          agentId: "AGT_001",
-          agentName: "Rajesh Kumar",
-          type: "Audio Issue",
-          date: "2024-01-14",
-          time: "13:15",
-          description: "Audio quality was poor during customer interaction",
-          videoId: "VID_001_20240114_1315",
-          status: "acknowledged",
-          approvedBy: "Team Lead",
-          acknowledgedAt: "2024-01-14 14:00",
-        },
-        {
-          id: "ERR_005",
-          uuid: "550e8400-e29b-41d4-a716-446655440005",
-          agentId: "AGT_002",
-          agentName: "Priya Sharma",
-          type: "Identity Verification",
-          date: "2024-01-13",
-          time: "11:30",
-          description: "Identity verification failed due to poor lighting",
-          videoId: "VID_002_20240113_1130",
-          status: "acknowledged",
-          approvedBy: "Team Lead",
-          acknowledgedAt: "2024-01-13 12:00",
-        },
-      ]
-
-      // Filter errors based on user role
-      if (userRole === "agent") {
-        return baseErrors.filter((error) => error.agentId === "AGT_001" && error.status !== "pending")
-      }
-
-      return baseErrors
-    }
-
-    // Generate sample saved queries
-    const generateSavedQueries = (): SavedQuery[] => [
-      {
-        id: "Q001",
-        name: "Daily Error Summary",
-        query: "Generate a summary of all errors from today with agent performance impact",
-        filters: { dateRange: "today", includeVideos: true },
-        createdAt: "2024-01-15",
-      },
-      {
-        id: "Q002",
-        name: "Weekly Team Performance",
-        query: "Analyze team error patterns and provide improvement recommendations",
-        filters: { dateRange: "week", groupBy: "agent" },
-        createdAt: "2024-01-10",
-      },
-    ]
-
-    // Generate sample scheduled reports
-    const generateScheduledReports = (): ScheduledReport[] => [
-      {
-        id: "SR001",
-        name: "Daily Error Alert",
-        queryId: "Q001",
-        schedule: "daily-16:00",
-        recipients: ["team-lead", "admin"],
-        template: "alert",
-        status: "active",
-        lastRun: "2024-01-15 16:00",
-        nextRun: "2024-01-16 16:00",
-      },
-      {
-        id: "SR002",
-        name: "Weekly Performance Report",
-        queryId: "Q002",
-        schedule: "weekly-monday-09:00",
-        recipients: ["all-agents", "management"],
-        template: "detailed",
-        status: "active",
-        nextRun: "2024-01-22 09:00",
-      },
-    ]
-
-    setErrors(generateErrorData())
-    setSavedQueries(generateSavedQueries())
-    setScheduledReports(generateScheduledReports())
-  }, [userRole])
+  if (errorsLoading || queriesLoading || reportsLoading) return <div>Loading...</div>;
+  if (errorsError || queriesError || reportsError) return <div>Error loading error analysis dashboard data.</div>;
 
   const handleVideoAccess = (videoId: string) => {
     alert(`Opening video recording: ${videoId}\n\nThis would redirect to your video system.`)
   }
 
   const handleApproveError = (errorId: string) => {
-    setErrors(
-      errors.map((error) =>
-        error.id === errorId ? { ...error, status: "approved", approvedBy: "Current User" } : error,
-      ),
-    )
+    // This function will need to be updated to use the actual errors data
+    // For now, it will just log a message
+    console.log(`Approving error with ID: ${errorId}`)
   }
 
   const handleRejectError = (errorId: string) => {
-    setErrors(errors.map((error) => (error.id === errorId ? { ...error, status: "rejected" } : error)))
+    // This function will need to be updated to use the actual errors data
+    // For now, it will just log a message
+    console.log(`Rejecting error with ID: ${errorId}`)
   }
 
   const handleAcknowledgeError = (errorId: string) => {
-    setErrors(
-      errors.map((error) =>
-        error.id === errorId ? { ...error, status: "acknowledged", acknowledgedAt: new Date().toISOString() } : error,
-      ),
-    )
+    // This function will need to be updated to use the actual errors data
+    // For now, it will just log a message
+    console.log(`Acknowledging error with ID: ${errorId}`)
   }
 
   const handleGenerateAIReport = async () => {
@@ -267,19 +140,13 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   }
 
   const handleSaveQuery = () => {
-    const newQuery: SavedQuery = {
-      id: `Q${String(savedQueries.length + 1).padStart(3, "0")}`,
-      name: `Query ${savedQueries.length + 1}`,
-      query: aiQuery,
-      filters: { dateFrom, dateTo, statusFilter, typeFilter },
-      createdAt: new Date().toISOString().split("T")[0],
-    }
-    setSavedQueries([...savedQueries, newQuery])
-    alert("Query saved successfully!")
+    // This function will need to be updated to use the actual savedQueries data
+    // For now, it will just log a message
+    console.log("Saving query:", aiQuery)
   }
 
   // Filter errors based on search and filters
-  const filteredErrors = errors.filter((error) => {
+  const filteredErrors = errors?.filter((error) => {
     const matchesSearch =
       error.agentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       error.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -296,16 +163,16 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   })
 
   // Separate today's and past errors
-  const todayErrors = filteredErrors.filter((error) => error.date === "2024-01-15")
-  const pastErrors = filteredErrors.filter((error) => error.date !== "2024-01-15")
+  const todayErrors = filteredErrors?.filter((error) => error.date === "2024-01-15")
+  const pastErrors = filteredErrors?.filter((error) => error.date !== "2024-01-15")
 
   // Error analytics data
   const errorStats = {
-    total: errors.length,
-    today: todayErrors.length,
-    pending: errors.filter((e) => e.status === "pending").length,
-    approved: errors.filter((e) => e.status === "approved").length,
-    acknowledged: errors.filter((e) => e.status === "acknowledged").length,
+    total: errors?.length || 0,
+    today: todayErrors?.length || 0,
+    pending: errors?.filter((e) => e.status === "pending").length || 0,
+    approved: errors?.filter((e) => e.status === "approved").length || 0,
+    acknowledged: errors?.filter((e) => e.status === "acknowledged").length || 0,
   }
 
   const errorTrendData = [
@@ -375,7 +242,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
             <div className="space-y-4">
               <h4 className="font-medium">Saved Queries</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {savedQueries.map((query) => (
+                {savedQueries?.map((query) => (
                   <div key={query.id} className="p-3 border rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-medium">{query.name}</h5>
@@ -400,7 +267,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
             <div className="space-y-4">
               <h4 className="font-medium">Scheduled Reports</h4>
               <div className="space-y-3">
-                {scheduledReports.map((report) => (
+                {scheduledReports?.map((report) => (
                   <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center space-x-3">
                       <FileSpreadsheet className="w-5 h-5 text-green-600" />
@@ -706,7 +573,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredErrors.map((error) => (
+                  {filteredErrors?.map((error) => (
                     <TableRow key={error.id}>
                       <TableCell className="font-mono text-xs">{error.uuid}</TableCell>
                       <TableCell>
@@ -803,7 +670,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-gray-600">
-                Showing 1-{filteredErrors.length} of {errors.length} errors
+                Showing 1-{filteredErrors?.length || 0} of {errors?.length || 0} errors
               </p>
               <div className="flex space-x-2">
                 <Button variant="outline" size="sm" disabled>
@@ -831,8 +698,8 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         <CardContent>
           <Tabs defaultValue="today" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="today">Today's Errors ({todayErrors.length})</TabsTrigger>
-              <TabsTrigger value="past">Past Errors ({pastErrors.length})</TabsTrigger>
+              <TabsTrigger value="today">Today's Errors ({todayErrors?.length || 0})</TabsTrigger>
+              <TabsTrigger value="past">Past Errors ({pastErrors?.length || 0})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="today">
@@ -850,7 +717,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {todayErrors.map((error) => (
+                  {todayErrors?.map((error) => (
                     <TableRow key={error.id}>
                       <TableCell className="font-mono text-xs">{error.uuid}</TableCell>
                       {(userRole === "admin" || userRole === "team-lead") && (
@@ -948,7 +815,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pastErrors.map((error) => (
+                  {pastErrors?.map((error) => (
                     <TableRow key={error.id}>
                       <TableCell className="font-mono text-xs">{error.uuid}</TableCell>
                       {(userRole === "admin" || userRole === "team-lead") && (

@@ -10,6 +10,7 @@ import { LeadershipDashboard } from "@/components/leadership-dashboard"
 import { AgentPerformanceDashboard } from "@/components/agent-performance-dashboard"
 import { TeamLeadOperations } from "@/components/team-lead-operations"
 import { AIMonitoringDashboard } from "@/components/ai-monitoring-dashboard"
+import { QualityCheckDashboard } from "@/components/quality-check-dashboard"
 
 
 
@@ -52,6 +53,7 @@ export default function VideoKYCDashboard() {
             <TabsTrigger value="calls">Calls Analytics</TabsTrigger>
             {userRole === "admin" && <TabsTrigger value="leadership">Global Leadership</TabsTrigger>}
             {userRole === "admin" && <TabsTrigger value="Ai-monitoring">Ai Monitoring</TabsTrigger>}
+            {userRole === "admin" && <TabsTrigger value="Quality-Check-Dashboard">Quality Check</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="overview">
@@ -90,6 +92,11 @@ export default function VideoKYCDashboard() {
           {userRole === "admin" && (
             <TabsContent value="Ai-monitoring">
               <AIMonitoringDashboard />
+            </TabsContent>
+          )}
+          {userRole === "admin" && (
+            <TabsContent value="Quality-Check-Dashboard">
+              <QualityCheckDashboard />
             </TabsContent>
           )}
         </Tabs>

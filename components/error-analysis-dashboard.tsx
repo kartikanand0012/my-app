@@ -279,7 +279,11 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   }
 
   // Filter errors based on search and filters
+<<<<<<< Updated upstream
   const filteredErrors = errors.filter((error) => {
+=======
+  const filteredErrors = errors?.filter((error: any) => {
+>>>>>>> Stashed changes
     const matchesSearch =
       error.agentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       error.type.toLowerCase().includes(searchTerm.toLowerCase()) ||

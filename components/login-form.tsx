@@ -30,13 +30,13 @@ export function LoginForm() {
     }
   };
 
-  const handleDemoLogin = async (role: 'admin' | 'manager' | 'agent') => {
+  const handleDemoLogin = async (role: 'admin' | 'team-lead' | 'agent') => {
     setIsLoading(true);
     setError('');
 
     const credentials = {
       admin: { email: 'admin@example.com', password: 'Test123@Password' },
-      manager: { email: 'teamlead@example.com', password: 'Test123@Password' },
+      'team-lead': { email: 'teamlead@example.com', password: 'Test123@Password' },
       agent: { email: 'agent@example.com', password: 'Test123@Password' },
     };
 
@@ -107,7 +107,7 @@ export function LoginForm() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleDemoLogin('manager')}
+                onClick={() => handleDemoLogin('team-lead')}
                 disabled={isLoading}
               >
                 Team Lead Demo

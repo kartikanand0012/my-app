@@ -157,14 +157,14 @@ export function TeamLeadOperations({ userRole, onAgentSelect }: TeamLeadOperatio
   })
 
   const teamPerformanceData = [
-    { hour: "09:00", errors: 2, calls: 45 },
-    { hour: "10:00", errors: 4, calls: 52 },
-    { hour: "11:00", errors: 3, calls: 48 },
-    { hour: "12:00", errors: 1, calls: 38 },
-    { hour: "13:00", errors: 5, calls: 44 },
-    { hour: "14:00", errors: 3, calls: 49 },
-    { hour: "15:00", errors: 6, calls: 51 },
-    { hour: "16:00", errors: 2, calls: 46 },
+    { hour: "09:00", errors: 2, calls: 45, callDrops: 3 },
+    { hour: "10:00", errors: 4, calls: 52, callDrops: 2 },
+    { hour: "11:00", errors: 3, calls: 48, callDrops: 4 },
+    { hour: "12:00", errors: 1, calls: 38, callDrops: 1 },
+    { hour: "13:00", errors: 5, calls: 44, callDrops: 3 },
+    { hour: "14:00", errors: 3, calls: 49, callDrops: 2 },
+    { hour: "15:00", errors: 6, calls: 51, callDrops: 5 },
+    { hour: "16:00", errors: 2, calls: 46, callDrops: 2 },
   ]
 
   const totalErrors = teamMembers.reduce((sum, member) => sum + member.todayErrors, 0)
@@ -260,6 +260,7 @@ export function TeamLeadOperations({ userRole, onAgentSelect }: TeamLeadOperatio
               <Tooltip />
               <Bar dataKey="calls" fill="#3b82f6" name="Total Calls" />
               <Bar dataKey="errors" fill="#ef4444" name="Errors" />
+              <Bar dataKey="callDrops" fill="#f59e0b" name="Call Drops" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

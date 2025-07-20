@@ -205,6 +205,28 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
 
   return (
     <div className="space-y-6">
+      {/* Agent Profile Header */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Avatar className="w-16 h-16">
+                <AvatarImage src={agentData.avatar || "/placeholder.svg"} />
+                <AvatarFallback>
+                  {agentData.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h2 className="text-2xl font-bold">{agentData.name}</h2>
+                <p className="text-gray-600">VKYC Specialist • Rank #{currentAgentRank}</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       {/* Date Range Control */}
       <Card>
         <CardContent className="p-4">
@@ -268,28 +290,7 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
         </Card>
       )}
 
-      {/* Agent Profile Header */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Avatar className="w-16 h-16">
-                <AvatarImage src={agentData.avatar || "/placeholder.svg"} />
-                <AvatarFallback>
-                  {agentData.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h2 className="text-2xl font-bold">{agentData.name}</h2>
-                <p className="text-gray-600">VKYC Specialist • Rank #{currentAgentRank}</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      
 
       {/* Performance Metrics - Fixed to show 6 cards including Active Hours */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">

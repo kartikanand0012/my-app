@@ -109,7 +109,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   useEffect(() => {
     // Generate sample error data based on user role
     const generateErrorData = (): ErrorData[] => {
-      const baseErrors = [
+      const baseErrors: ErrorData[] = [
         {
           id: "ERR_001",
           uuid: "550e8400-e29b-41d4-a716-446655440001",
@@ -328,166 +328,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
 
   return (
     <div className="space-y-6">
-      {/* AI-Powered Automated Reporting System */}
-      {(userRole === "admin" || userRole === "team-lead") && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center space-x-2">
-                <Bot className="w-5 h-5" />
-                <span>AI-Powered Automated Reporting System</span>
-              </span>
-              <div className="flex items-center space-x-2">
-                <Switch id="auto-reports" checked={autoReportEnabled} onCheckedChange={setAutoReportEnabled} />
-                <Label htmlFor="auto-reports" className="text-sm">
-                  Auto Reports
-                </Label>
-              </div>
-            </CardTitle>
-            <CardDescription>
-              Use AI to generate intelligent reports, schedule automated notifications, and manage team communications
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* AI Query Interface */}
-            <div className="space-y-4">
-              <Label htmlFor="ai-query">AI Query Generator</Label>
-              <Textarea
-                id="ai-query"
-                placeholder="Ask AI to generate reports... e.g., 'Generate a summary of today's errors with performance impact analysis and recommendations'"
-                value={aiQuery}
-                onChange={(e) => setAiQuery(e.target.value)}
-                rows={3}
-              />
-              <div className="flex space-x-2">
-                <Button onClick={handleGenerateAIReport} disabled={isGeneratingReport}>
-                  <Bot className="w-4 h-4 mr-2" />
-                  {isGeneratingReport ? "Generating..." : "Generate AI Report"}
-                </Button>
-                <Button variant="outline" onClick={handleSaveQuery}>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Query
-                </Button>
-              </div>
-            </div>
-
-            {/* Saved Queries */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Saved Queries</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {savedQueries.map((query) => (
-                  <div key={query.id} className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h5 className="font-medium">{query.name}</h5>
-                      <Badge variant="outline">{query.createdAt}</Badge>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">{query.query}</p>
-                    <div className="flex space-x-2">
-                      <Button size="sm" variant="outline" onClick={() => setAiQuery(query.query)}>
-                        Load Query
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Settings className="w-3 h-3 mr-1" />
-                        Schedule
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Report Scheduling */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Scheduled Reports</h4>
-              <div className="space-y-3">
-                {scheduledReports.map((report) => (
-                  <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <FileSpreadsheet className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">{report.name}</p>
-                        <p className="text-sm text-gray-600">
-                          Next run: {report.nextRun} | Recipients: {report.recipients.join(", ")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge
-                        variant="outline"
-                        className={
-                          report.status === "active"
-                            ? "text-green-600 border-green-200"
-                            : "text-gray-600 border-gray-200"
-                        }
-                      >
-                        {report.status}
-                      </Badge>
-                      <Button size="sm" variant="outline">
-                        <Settings className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Team Communication Settings */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h4 className="font-medium">Team Communication</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Switch id="tag-all" checked={tagAllUsers} onCheckedChange={setTagAllUsers} />
-                    <Label htmlFor="tag-all" className="text-sm">
-                      Tag all team members
-                    </Label>
-                  </div>
-                  <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select message template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="standard">Standard Report</SelectItem>
-                      <SelectItem value="alert">Error Alert</SelectItem>
-                      <SelectItem value="detailed">Detailed Analysis</SelectItem>
-                      <SelectItem value="summary">Executive Summary</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Textarea
-                    placeholder="Custom message to include with reports..."
-                    value={customMessage}
-                    onChange={(e) => setCustomMessage(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-medium">Quick Actions</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" size="sm">
-                    <Send className="w-3 h-3 mr-1" />
-                    Send Now
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <MessageSquare className="w-3 h-3 mr-1" />
-                    Teams Settings
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Users className="w-3 h-3 mr-1" />
-                    Manage Recipients
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Tag className="w-3 h-3 mr-1" />
-                    Tag Settings
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+     
 
       {/* Filters and Search */}
       <Card>
@@ -662,9 +503,10 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                   cx="50%"
                   cy="50%"
                   outerRadius={80}
+                  innerRadius={40}
                   fill="#8884d8"
                   dataKey="count"
-                  label={({ type, percentage }) => `${type}: ${percentage}%`}
+                  label={({ type, count }) => `${type}: ${count}`}
                 >
                   {errorTypesData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -677,7 +519,8 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         </Card>
       </div>
 
-      {/* Team Lead Error Approval Section */}
+      {/* Team Lead Error Approval Section - COMMENTED OUT */}
+      {/*
       {(userRole === "admin" || userRole === "team-lead") && (
         <Card>
           <CardHeader>
@@ -690,7 +533,6 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Error Management Table */}
             <div className="border rounded-lg">
               <Table>
                 <TableHeader>
@@ -800,7 +642,6 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
               </Table>
             </div>
 
-            {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-gray-600">
                 Showing 1-{filteredErrors.length} of {errors.length} errors
@@ -817,6 +658,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
           </CardContent>
         </Card>
       )}
+      */}
 
       {/* Error Details Tables */}
       <Card>
@@ -1014,6 +856,166 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
           </Tabs>
         </CardContent>
       </Card>
+       {/* AI-Powered Automated Reporting System */}
+       {(userRole === "admin" || userRole === "team-lead") && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center space-x-2">
+                <Bot className="w-5 h-5" />
+                <span>AI-Powered Automated Reporting System</span>
+              </span>
+              <div className="flex items-center space-x-2">
+                <Switch id="auto-reports" checked={autoReportEnabled} onCheckedChange={setAutoReportEnabled} />
+                <Label htmlFor="auto-reports" className="text-sm">
+                  Auto Reports
+                </Label>
+              </div>
+            </CardTitle>
+            <CardDescription>
+              Use AI to generate intelligent reports, schedule automated notifications, and manage team communications
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* AI Query Interface */}
+            <div className="space-y-4">
+              <Label htmlFor="ai-query">AI Query Generator</Label>
+              <Textarea
+                id="ai-query"
+                placeholder="Ask AI to generate reports... e.g., 'Generate a summary of today's errors with performance impact analysis and recommendations'"
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                rows={3}
+              />
+              <div className="flex space-x-2">
+                <Button onClick={handleGenerateAIReport} disabled={isGeneratingReport}>
+                  <Bot className="w-4 h-4 mr-2" />
+                  {isGeneratingReport ? "Generating..." : "Generate AI Report"}
+                </Button>
+                <Button variant="outline" onClick={handleSaveQuery}>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Query
+                </Button>
+              </div>
+            </div>
+
+            {/* Saved Queries */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Saved Queries</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {savedQueries.map((query) => (
+                  <div key={query.id} className="p-3 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-medium">{query.name}</h5>
+                      <Badge variant="outline">{query.createdAt}</Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">{query.query}</p>
+                    <div className="flex space-x-2">
+                      <Button size="sm" variant="outline" onClick={() => setAiQuery(query.query)}>
+                        Load Query
+                      </Button>
+                      <Button size="sm" variant="outline">
+                        <Settings className="w-3 h-3 mr-1" />
+                        Schedule
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Report Scheduling */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Scheduled Reports</h4>
+              <div className="space-y-3">
+                {scheduledReports.map((report) => (
+                  <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <FileSpreadsheet className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="font-medium">{report.name}</p>
+                        <p className="text-sm text-gray-600">
+                          Next run: {report.nextRun} | Recipients: {report.recipients.join(", ")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge
+                        variant="outline"
+                        className={
+                          report.status === "active"
+                            ? "text-green-600 border-green-200"
+                            : "text-gray-600 border-gray-200"
+                        }
+                      >
+                        {report.status}
+                      </Badge>
+                      <Button size="sm" variant="outline">
+                        <Settings className="w-3 h-3 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Team Communication Settings */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="font-medium">Team Communication</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Switch id="tag-all" checked={tagAllUsers} onCheckedChange={setTagAllUsers} />
+                    <Label htmlFor="tag-all" className="text-sm">
+                      Tag all team members
+                    </Label>
+                  </div>
+                  <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select message template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standard">Standard Report</SelectItem>
+                      <SelectItem value="alert">Error Alert</SelectItem>
+                      <SelectItem value="detailed">Detailed Analysis</SelectItem>
+                      <SelectItem value="summary">Executive Summary</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    placeholder="Custom message to include with reports..."
+                    value={customMessage}
+                    onChange={(e) => setCustomMessage(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Quick Actions</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" size="sm">
+                    <Send className="w-3 h-3 mr-1" />
+                    Send Now
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <MessageSquare className="w-3 h-3 mr-1" />
+                    Teams Settings
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <Users className="w-3 h-3 mr-1" />
+                    Manage Recipients
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <Tag className="w-3 h-3 mr-1" />
+                    Tag Settings
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

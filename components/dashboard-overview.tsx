@@ -239,9 +239,10 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                   cx="50%"
                   cy="50%"
                   outerRadius={80}
+                  innerRadius={40}
                   fill="#8884d8"
                   dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}%`}
+                  label={({ name, value }) => `${name}: ${value}`}
                 >
                   {errorDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -260,7 +261,7 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Clock className="w-5 h-5" />
-              <span>Average Call Duration</span>
+              <span>Average TAT(Turn Around Time)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>

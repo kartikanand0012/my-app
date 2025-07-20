@@ -831,7 +831,6 @@ export function AIQueryAutomationPanel({ userRole }: { userRole: string }) {
                                   type="button" 
                                   variant="outline" 
                                   size="sm"
-                                  className="text-black"
                                   onClick={() => {
                                     const newUsers = scheduleForm.tagged_users.filter((_, i) => i !== index);
                                     setScheduleForm(prev => ({ ...prev, tagged_users: newUsers }));
@@ -846,7 +845,6 @@ export function AIQueryAutomationPanel({ userRole }: { userRole: string }) {
                             type="button" 
                             variant="outline" 
                             size="sm" 
-                            className="text-black"
                             onClick={() => setScheduleForm(prev => ({ 
                               ...prev, 
                               tagged_users: [...prev.tagged_users, ''] 
@@ -864,7 +862,6 @@ export function AIQueryAutomationPanel({ userRole }: { userRole: string }) {
                           <Button 
                             type="button" 
                             variant="outline" 
-                            className="text-black"
                             onClick={() => setShowScheduleDialog(false)}
                           >
                             Cancel
@@ -924,7 +921,6 @@ export function AIQueryAutomationPanel({ userRole }: { userRole: string }) {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-black"
                               onClick={async () => {
                                 try {
                                   const response = await updateScheduledReport(report.id, { is_active: !report.is_active });
@@ -997,7 +993,6 @@ export function AIQueryAutomationPanel({ userRole }: { userRole: string }) {
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="text-black"
                   onClick={() => setShowVariablesDialog(false)}
                 >
                   Cancel

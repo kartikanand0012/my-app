@@ -1,5 +1,5 @@
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api',
+  BASE_URL: 'https://my-app-be-u7uh.onrender.com/api',
   USE_MOCK_API: process.env.NEXT_PUBLIC_USE_MOCK_API === 'true' || false,
 };
 

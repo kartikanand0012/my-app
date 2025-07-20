@@ -218,7 +218,7 @@ export function AIQueryPanel() {
                 onChange={(e) => setQuery(e.target.value)}
                 className="flex-1"
               />
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" disabled={isLoading} className="text-white">
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : useAIAgent ? (

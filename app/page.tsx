@@ -38,7 +38,7 @@ export default function VideoKYCDashboard() {
     if (user) {
       const roleMapping: { [key: string]: "admin" | "team-lead" | "agent" } = {
         'admin': 'admin',
-        'manager': 'team-lead',
+        'team-lead': 'team-lead',
         'user': 'agent'
       }
       setUserRole(roleMapping[user.role] || 'agent')
@@ -81,9 +81,11 @@ export default function VideoKYCDashboard() {
         </div>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="ai-automation">AI & Automation</TabsTrigger>
+            {(userRole === "admin" || userRole === "team-lead") && (
+              <TabsTrigger value="ai-automation">AI & Automation</TabsTrigger>
+            )}
             <TabsTrigger value="performance">
               {userRole === "agent" ? "My Performance" : "Agent Performance"}
             </TabsTrigger>
@@ -91,9 +93,13 @@ export default function VideoKYCDashboard() {
             {(userRole === "admin" || userRole === "team-lead") && (
               <TabsTrigger value="team-operations">Team Operations</TabsTrigger>
             )}
-            <TabsTrigger value="calls">Calls Analytics</TabsTrigger>
+            {(userRole === "admin" || userRole === "team-lead") && (
+              <TabsTrigger value="calls">Calls Analytics</TabsTrigger>
+            )}
             {userRole === "admin" && <TabsTrigger value="leadership">Global Leadership</TabsTrigger>}
-            {userRole === "admin" && <TabsTrigger value="Ai-monitoring">Ai Monitoring</TabsTrigger>}
+            {(userRole === "admin" || userRole === "team-lead") && (
+              <TabsTrigger value="Ai-monitoring">Ai Monitoring</TabsTrigger>
+            )}
             {userRole === "admin" && <TabsTrigger value="Quality-Check-Dashboard">Quality Check</TabsTrigger>}
           </TabsList>
 
@@ -101,9 +107,11 @@ export default function VideoKYCDashboard() {
             <DashboardOverview userRole={userRole === "agent" ? "employee" : userRole} />
           </TabsContent>
 
-          <TabsContent value="ai-automation">
-            <AIQueryAutomationPanel userRole={userRole} />
-          </TabsContent>
+          {(userRole === "admin" || userRole === "team-lead") && (
+            <TabsContent value="ai-automation">
+              <AIQueryAutomationPanel userRole={userRole} />
+            </TabsContent>
+          )}
 
           <TabsContent value="performance">
             <AgentPerformanceDashboard
@@ -133,7 +141,7 @@ export default function VideoKYCDashboard() {
             </TabsContent>
           )}
 
-          {userRole === "admin" && (
+          {(userRole === "admin" || userRole === "team-lead") && (
             <TabsContent value="Ai-monitoring">
               <AIMonitoringDashboard />
             </TabsContent>

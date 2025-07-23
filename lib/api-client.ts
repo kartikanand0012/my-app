@@ -1,4 +1,4 @@
-import { API_CONFIG } from './config';
+import { API_CONFIG, ENDPOINTS } from './config';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -71,6 +71,104 @@ class ApiClient {
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+
+  // ===== AGENT PERFORMANCE APIs =====
+  async getAgentProfile(agentId: string, dateRange?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ANALYTICS.AGENT_PROFILE}/${agentId}${dateRange ? `?date_range=${dateRange}` : ''}`;
+    return this.get(url);
+  }
+
+  async getAgentWeeklyTrend(agentId: string, dateRange?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ANALYTICS.AGENT_WEEKLY_TREND}/${agentId}${dateRange ? `?date_range=${dateRange}` : ''}`;
+    return this.get(url);
+  }
+
+  async getAgentHourlyCalls(agentId: string, date?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ANALYTICS.AGENT_HOURLY_CALLS}/${agentId}${date ? `?date=${date}` : ''}`;
+    return this.get(url);
+  }
+
+  async getAgentMonthlyStats(agentId: string, month?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ANALYTICS.AGENT_MONTHLY_STATS}/${agentId}${month ? `?month=${month}` : ''}`;
+    return this.get(url);
+  }
+
+  async getLeaderboard(limit?: number, dateRange?: string): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', limit.toString());
+    if (dateRange) params.set('date_range', dateRange);
+    const url = `${ENDPOINTS.ANALYTICS.LEADERBOARD}${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.get(url);
+  }
+
+  async getAllAgents(dateRange?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ANALYTICS.ALL_AGENTS}${dateRange ? `?date_range=${dateRange}` : ''}`;
+    return this.get(url);
+  }
+
+  // ===== ERROR ANALYTICS APIs =====
+  async getErrorStats(dateRange?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ERROR_ANALYTICS.ERROR_STATS}${dateRange ? `?date_range=${dateRange}` : ''}`;
+    return this.get(url);
+  }
+
+  async getErrorTrend(days?: number): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ERROR_ANALYTICS.ERROR_TREND}${days ? `?days=${days}` : ''}`;
+    return this.get(url);
+  }
+
+  async getErrorTypesDistribution(dateRange?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ERROR_ANALYTICS.ERROR_TYPES_DISTRIBUTION}${dateRange ? `?date_range=${dateRange}` : ''}`;
+    return this.get(url);
+  }
+
+  async getErrorDetails(filters: {
+    date_range?: string;
+    search?: string;
+    status_filter?: string;
+    type_filter?: string;
+    uuid_filter?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.set(key, value.toString());
+      }
+    });
+    const url = `${ENDPOINTS.ERROR_ANALYTICS.ERROR_DETAILS}${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.get(url);
+  }
+
+  async acknowledgeError(errorId: string): Promise<ApiResponse<any>> {
+    return this.post(`${ENDPOINTS.ERROR_ANALYTICS.ACKNOWLEDGE_ERROR}/${errorId}/acknowledge`);
+  }
+
+  async approveError(errorId: string): Promise<ApiResponse<any>> {
+    return this.post(`${ENDPOINTS.ERROR_ANALYTICS.APPROVE_ERROR}/${errorId}/approve`);
+  }
+
+  async getSavedQueries(): Promise<ApiResponse<any>> {
+    return this.get(ENDPOINTS.ERROR_ANALYTICS.SAVED_QUERIES);
+  }
+
+  async saveQuery(data: { name: string; query: string; filters: any }): Promise<ApiResponse<any>> {
+    return this.post(ENDPOINTS.ERROR_ANALYTICS.SAVE_QUERY, data);
+  }
+
+  async getScheduledReports(): Promise<ApiResponse<any>> {
+    return this.get(ENDPOINTS.ERROR_ANALYTICS.SCHEDULED_REPORTS);
+  }
+
+  async generateAIReport(data: { query: string; filters: any }): Promise<ApiResponse<any>> {
+    return this.post(ENDPOINTS.ERROR_ANALYTICS.GENERATE_AI_REPORT, data);
+  }
+
+  // ===== DASHBOARD OVERVIEW APIs =====
+  async getDashboardStats(): Promise<ApiResponse<any>> {
+    return this.get(ENDPOINTS.AUTH.DASHBOARD_STATS);
   }
 
   async uploadFile<T>(endpoint: string, file: File, additionalData?: any): Promise<ApiResponse<T>> {

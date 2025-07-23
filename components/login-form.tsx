@@ -34,13 +34,12 @@ export function LoginForm() {
     setIsLoading(true);
     setError('');
 
-    const credentials = {
-      admin: { email: 'admin@example.com', password: 'Test123@Password' },
-      'team-lead': { email: 'teamlead@example.com', password: 'Test123@Password' },
-      agent: { email: 'agent@example.com', password: 'Test123@Password' },
-    };
-
     try {
+      const credentials = {
+        admin: { email: 'admin@vkyc.com', password: 'Agent@123' },
+        'team-lead': { email: 'teamlead1@vkyc.com', password: 'Agent@123' },
+        agent: { email: 'sharvani.s@slicebank.com', password: 'Agent@123' },
+      };
       await login(credentials[role].email, credentials[role].password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -93,7 +92,7 @@ export function LoginForm() {
             </Button>
           </form>
 
-          <div className="mt-6 space-y-2">
+          <div className="mt-6 space-y-3">
             <p className="text-sm text-gray-600 text-center">Demo Accounts:</p>
             <div className="grid grid-cols-1 gap-2">
               <Button
@@ -120,6 +119,15 @@ export function LoginForm() {
               >
                 Agent Demo
               </Button>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-50 rounded-md">
+              <p className="text-sm text-blue-800 font-medium">Demo Credentials:</p>
+              <div className="text-xs text-blue-600 mt-1 space-y-1">
+                <div><strong>Admin:</strong> admin@vkyc.com / Agent@123</div>
+                <div><strong>Team Lead:</strong> teamlead1@vkyc.com / Agent@123</div>
+                <div><strong>Agent:</strong> sharvani.s@slicebank.com / Agent@123</div>
+              </div>
             </div>
           </div>
         </CardContent>

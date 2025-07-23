@@ -15,6 +15,7 @@ import { QualityCheckDashboard } from "@/components/quality-check-dashboard"
 import { AIQueryAutomationPanel } from "@/components/ai-query-automation-panel"
 import { LoginForm } from "@/components/login-form"
 import { useAuth } from "@/lib/auth-context"
+import { DashboardProvider } from "@/lib/dashboard-context"
 import { LogOut, User } from "lucide-react"
 
 
@@ -38,8 +39,8 @@ export default function VideoKYCDashboard() {
     if (user) {
       const roleMapping: { [key: string]: "admin" | "team-lead" | "agent" } = {
         'admin': 'admin',
-        'team-lead': 'team-lead',
-        'user': 'agent'
+        'teamlead': 'team-lead',
+        'agent': 'agent'
       }
       setUserRole(roleMapping[user.role] || 'agent')
     }
@@ -68,7 +69,7 @@ export default function VideoKYCDashboard() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <User className="h-4 w-4" />
-              <span>{user?.username}</span>
+              <span>{user?.agent_name}</span>
               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                 {userRole}
               </span>
@@ -80,78 +81,80 @@ export default function VideoKYCDashboard() {
           </div>
         </div>
 
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
+        <DashboardProvider userRole={userRole}>
+          <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              {(userRole === "admin" || userRole === "team-lead") && (
+                <TabsTrigger value="ai-automation">AI & Automation</TabsTrigger>
+              )}
+              <TabsTrigger value="performance">
+                {userRole === "agent" ? "My Performance" : "Agent Performance"}
+              </TabsTrigger>
+              <TabsTrigger value="errors">Error Analysis</TabsTrigger>
+              {(userRole === "admin" || userRole === "team-lead") && (
+                <TabsTrigger value="team-operations">Team Operations</TabsTrigger>
+              )}
+              {(userRole === "admin" || userRole === "team-lead") && (
+                <TabsTrigger value="calls">Calls Analytics</TabsTrigger>
+              )}
+              {userRole === "admin" && <TabsTrigger value="leadership">Global Leadership</TabsTrigger>}
+              {(userRole === "admin" || userRole === "team-lead") && (
+                <TabsTrigger value="Ai-monitoring">Ai Monitoring</TabsTrigger>
+              )}
+              {userRole === "admin" && <TabsTrigger value="Quality-Check-Dashboard">Quality Check</TabsTrigger>}
+            </TabsList>
+
+            <TabsContent value="overview">
+              <DashboardOverview userRole={userRole === "agent" ? "employee" : userRole} />
+            </TabsContent>
+
             {(userRole === "admin" || userRole === "team-lead") && (
-              <TabsTrigger value="ai-automation">AI & Automation</TabsTrigger>
+              <TabsContent value="ai-automation">
+                <AIQueryAutomationPanel userRole={userRole} />
+              </TabsContent>
             )}
-            <TabsTrigger value="performance">
-              {userRole === "agent" ? "My Performance" : "Agent Performance"}
-            </TabsTrigger>
-            <TabsTrigger value="errors">Error Analysis</TabsTrigger>
+
+            <TabsContent value="performance">
+              <AgentPerformanceDashboard
+                userRole={userRole}
+                selectedAgent={selectedAgent}
+                onAgentSelect={handleAgentSelect}
+              />
+            </TabsContent>
+
+            <TabsContent value="errors">
+              <ErrorAnalysisDashboard userRole={userRole} selectedAgent={selectedAgent} />
+            </TabsContent>
+
             {(userRole === "admin" || userRole === "team-lead") && (
-              <TabsTrigger value="team-operations">Team Operations</TabsTrigger>
+              <TabsContent value="team-operations">
+                <TeamLeadOperations userRole={userRole} onAgentSelect={handleAgentSelect} />
+              </TabsContent>
             )}
+
+            <TabsContent value="calls">
+              <CallsAnalytics userRole={userRole === "agent" ? "employee" : userRole} />
+            </TabsContent>
+
+            {userRole === "admin" && (
+              <TabsContent value="leadership">
+                <LeadershipDashboard onAgentSelect={handleAgentSelect} />
+              </TabsContent>
+            )}
+
             {(userRole === "admin" || userRole === "team-lead") && (
-              <TabsTrigger value="calls">Calls Analytics</TabsTrigger>
+              <TabsContent value="Ai-monitoring">
+                <AIMonitoringDashboard />
+              </TabsContent>
             )}
-            {userRole === "admin" && <TabsTrigger value="leadership">Global Leadership</TabsTrigger>}
-            {(userRole === "admin" || userRole === "team-lead") && (
-              <TabsTrigger value="Ai-monitoring">Ai Monitoring</TabsTrigger>
+            {userRole === "admin" && (
+              <TabsContent value="Quality-Check-Dashboard">
+                <QualityCheckDashboard />
+              </TabsContent>
             )}
-            {userRole === "admin" && <TabsTrigger value="Quality-Check-Dashboard">Quality Check</TabsTrigger>}
-          </TabsList>
-
-          <TabsContent value="overview">
-            <DashboardOverview userRole={userRole === "agent" ? "employee" : userRole} />
-          </TabsContent>
-
-          {(userRole === "admin" || userRole === "team-lead") && (
-            <TabsContent value="ai-automation">
-              <AIQueryAutomationPanel userRole={userRole} />
-            </TabsContent>
-          )}
-
-          <TabsContent value="performance">
-            <AgentPerformanceDashboard
-              userRole={userRole}
-              selectedAgent={selectedAgent}
-              onAgentSelect={handleAgentSelect}
-            />
-          </TabsContent>
-
-          <TabsContent value="errors">
-            <ErrorAnalysisDashboard userRole={userRole} selectedAgent={selectedAgent} />
-          </TabsContent>
-
-          {(userRole === "admin" || userRole === "team-lead") && (
-            <TabsContent value="team-operations">
-              <TeamLeadOperations userRole={userRole} onAgentSelect={handleAgentSelect} />
-            </TabsContent>
-          )}
-
-          <TabsContent value="calls">
-            <CallsAnalytics userRole={userRole === "agent" ? "employee" : userRole} />
-          </TabsContent>
-
-          {userRole === "admin" && (
-            <TabsContent value="leadership">
-              <LeadershipDashboard onAgentSelect={handleAgentSelect} />
-            </TabsContent>
-          )}
-
-          {(userRole === "admin" || userRole === "team-lead") && (
-            <TabsContent value="Ai-monitoring">
-              <AIMonitoringDashboard />
-            </TabsContent>
-          )}
-          {userRole === "admin" && (
-            <TabsContent value="Quality-Check-Dashboard">
-              <QualityCheckDashboard />
-            </TabsContent>
-          )}
-        </Tabs>
+          </Tabs>
+        </DashboardProvider>
       </div>
     </div>
   )

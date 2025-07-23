@@ -49,7 +49,7 @@ A modern Next.js frontend for the AI Analytics platform with comprehensive dashb
    
    Edit `.env.local`:
    ```env
-   NEXT_PUBLIC_API_URL=http://localhost:3000/api
+   NEXT_PUBLIC_API_URL=http://localhost:3001/api
    NEXT_PUBLIC_USE_MOCK_API=false
    ```
 

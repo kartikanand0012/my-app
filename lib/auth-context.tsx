@@ -4,11 +4,11 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { API_CONFIG, ENDPOINTS } from './config';
 
 interface User {
-  id: number;
-  username: string;
-  email: string;
+  agent_id: number;
+  agent_email: string;
+  agent_name: string;
   role: string;
-  agent_id?: number;
+  status: string;
 }
 
 interface AuthContextType {
@@ -16,7 +16,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   getToken: () => string | null;
 }
 
@@ -35,44 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      // Mock login for demo accounts
-      if (email === 'admin@example.com' && password === 'Test123@Password') {
-        const mockUser = {
-          id: 1,
-          username: 'Admin User',
-          email: 'admin@example.com',
-          role: 'admin',
-        };
-        localStorage.setItem('auth_token', 'mock_token_admin');
-        setUser(mockUser);
-        return;
-      }
-      
-      if (email === 'teamlead@example.com' && password === 'Test123@Password') {
-        const mockUser = {
-          id: 2,
-          username: 'Team Lead User',
-          email: 'teamlead@example.com',
-          role: 'team-lead',
-        };
-        localStorage.setItem('auth_token', 'mock_token_teamlead');
-        setUser(mockUser);
-        return;
-      }
-      
-      if (email === 'agent@example.com' && password === 'Test123@Password') {
-        const mockUser = {
-          id: 3,
-          username: 'Agent User',
-          email: 'agent@example.com',
-          role: 'user',
-        };
-        localStorage.setItem('auth_token', 'mock_token_agent');
-        setUser(mockUser);
-        return;
-      }
-
-      // Real API login (fallback)
       const response = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AUTH.LOGIN}`, {
         method: 'POST',
         headers: {
@@ -82,7 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!response.ok) {
-        throw new Error('Login failed');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
       }
 
       const data = await response.json();
@@ -99,7 +62,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const token = getToken();
+    if (token) {
+      try {
+        await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AUTH.LOGOUT}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
+    
     localStorage.removeItem('auth_token');
     setUser(null);
   };

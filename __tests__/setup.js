@@ -91,7 +91,7 @@ global.testConfig = {
     }
   },
   mockApiEndpoints: {
-    base: 'http://localhost:3000/api',
+    base: 'http://localhost:3001/api',
     auth: {
       login: '/auth/login',
       profile: '/auth/profile'

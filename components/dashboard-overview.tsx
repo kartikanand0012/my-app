@@ -1,5 +1,6 @@
 "use client"
 
+import { useDashboard } from "@/lib/dashboard-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -33,39 +34,71 @@ interface DashboardOverviewProps {
 }
 
 export function DashboardOverview({ userRole }: DashboardOverviewProps) {
-  // Sample data for charts
-  const performanceData = [
-    { name: "Mon", calls: 45, success: 89, errors: 3 },
-    { name: "Tue", calls: 52, success: 92, errors: 2 },
-    { name: "Wed", calls: 48, success: 87, errors: 4 },
-    { name: "Thu", calls: 51, success: 94, errors: 1 },
-    { name: "Fri", calls: 47, success: 89, errors: 3 },
-  ]
+  const {
+    dashboardStats,
+    errorStats,
+    errorTrendData,
+    errorTypesData,
+    agentProfile,
+    loading,
+    error
+  } = useDashboard()
 
-  const errorDistribution = [
-    { name: "Document Quality", value: 35, color: "#ef4444" },
-    { name: "Network Issues", value: 28, color: "#f59e0b" },
-    { name: "Identity Verification", value: 22, color: "#3b82f6" },
-    { name: "System Timeout", value: 15, color: "#10b981" },
-  ]
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="p-8 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Loading dashboard data...</p>
+      </div>
+    )
+  }
 
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <div className="text-red-600 mb-4">
+          <XCircle className="h-8 w-8 mx-auto mb-2" />
+          <p className="text-lg font-semibold">Error Loading Dashboard</p>
+          <p className="text-sm">{error}</p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Reload Dashboard
+        </button>
+      </div>
+    )
+  }
+
+  // Calculate derived data
+  const agentStats = agentProfile?.todayStats || {}
   const teamStats = {
-    totalAgents: 25,
-    activeAgents: 23,
-    totalCalls: 1247,
-    successRate: 91.2,
-    totalErrors: 47,
-    avgCallDuration: 8.5,
+    totalAgents: dashboardStats?.agents?.total_agents || 0,
+    activeAgents: dashboardStats?.agents?.active_agents || 0,
+    totalCalls: dashboardStats?.sessions?.total_sessions || 0,
+    callsToday: dashboardStats?.sessions?.sessions_today || 0,
+    successRate: errorStats?.successRate || 0,
+    totalErrors: errorStats?.total || 0,
+    avgCallDuration: errorStats?.avgDuration || 0,
   }
 
-  const agentStats = {
-    callsToday: 47,
-    successRate: 89.4,
-    errorsToday: 3,
-    avgDuration: 8.2,
-    rank: 4,
-    activeHours: 7.5,
-  }
+  // Transform error trend data for chart
+  const performanceData = errorTrendData.map(item => ({
+    name: item.date || item.day,
+    calls: item.calls || item.sessions || 0,
+    success: item.successRate || 0,
+    errors: item.errors || item.errorCount || 0
+  }))
+
+  // Transform error types data for pie chart
+  const errorDistribution = errorTypesData.map((item, index) => ({
+    name: item.type || item.errorType,
+    value: item.count || item.value,
+    color: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'][index % 5]
+  }))
 
   return (
     <div className="space-y-6">
@@ -79,10 +112,10 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                   <Phone className="w-8 h-8 text-blue-600" />
                   <div>
                     <p className="text-sm font-medium text-gray-600">Calls Today</p>
-                    <p className="text-2xl font-bold text-gray-900">{agentStats.callsToday}</p>
+                    <p className="text-2xl font-bold text-gray-900">{agentStats.callsCompleted || 0}</p>
                     <p className="text-xs text-blue-600 flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 mr-1" />
-                      +5 from yesterday
+                      Today's total
                     </p>
                   </div>
                 </div>
@@ -95,10 +128,10 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                   <CheckCircle className="w-8 h-8 text-green-600" />
                   <div>
                     <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">{agentStats.successRate}%</p>
+                    <p className="text-2xl font-bold text-gray-900">{agentStats.successRate || 0}%</p>
                     <p className="text-xs text-green-600 flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 mr-1" />
-                      +2.1% this week
+                      Performance
                     </p>
                   </div>
                 </div>
@@ -111,10 +144,10 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                   <XCircle className="w-8 h-8 text-red-600" />
                   <div>
                     <p className="text-sm font-medium text-gray-600">Errors Today</p>
-                    <p className="text-2xl font-bold text-gray-900">{agentStats.errorsToday}</p>
+                    <p className="text-2xl font-bold text-gray-900">{agentStats.errorCount || 0}</p>
                     <p className="text-xs text-red-600 flex items-center mt-1">
                       <TrendingDown className="w-3 h-3 mr-1" />
-                      -1 from yesterday
+                      Today's count
                     </p>
                   </div>
                 </div>
@@ -127,10 +160,10 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                   <Target className="w-8 h-8 text-purple-600" />
                   <div>
                     <p className="text-sm font-medium text-gray-600">Current Rank</p>
-                    <p className="text-2xl font-bold text-gray-900">#{agentStats.rank}</p>
+                    <p className="text-2xl font-bold text-gray-900">#{agentProfile?.rank || 0}</p>
                     <p className="text-xs text-purple-600 flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 mr-1" />
-                      +1 this week
+                      Team ranking
                     </p>
                   </div>
                 </div>
@@ -148,7 +181,7 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                     <p className="text-2xl font-bold text-gray-900">
                       {teamStats.activeAgents}/{teamStats.totalAgents}
                     </p>
-                    <p className="text-xs text-blue-600">92% availability</p>
+                    <p className="text-xs text-blue-600">{teamStats.totalAgents > 0 ? Math.round((teamStats.activeAgents / teamStats.totalAgents) * 100) : 0}% availability</p>
                   </div>
                 </div>
               </CardContent>
@@ -159,11 +192,11 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                 <div className="flex items-center space-x-2">
                   <Phone className="w-8 h-8 text-green-600" />
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Calls</p>
-                    <p className="text-2xl font-bold text-gray-900">{teamStats.totalCalls}</p>
+                    <p className="text-sm font-medium text-gray-600">Calls Today</p>
+                    <p className="text-2xl font-bold text-gray-900">{teamStats.callsToday}</p>
                     <p className="text-xs text-green-600 flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 mr-1" />
-                      +12% this week
+                      Today's sessions
                     </p>
                   </div>
                 </div>
@@ -176,10 +209,10 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                   <CheckCircle className="w-8 h-8 text-emerald-600" />
                   <div>
                     <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">{teamStats.successRate}%</p>
+                    <p className="text-2xl font-bold text-gray-900">{teamStats.successRate || 0}%</p>
                     <p className="text-xs text-emerald-600 flex items-center mt-1">
                       <TrendingUp className="w-3 h-3 mr-1" />
-                      +1.5% this month
+                      Team average
                     </p>
                   </div>
                 </div>
@@ -191,11 +224,11 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                 <div className="flex items-center space-x-2">
                   <AlertTriangle className="w-8 h-8 text-red-600" />
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Errors</p>
-                    <p className="text-2xl font-bold text-gray-900">{teamStats.totalErrors}</p>
+                    <p className="text-sm font-medium text-gray-600">Errors Today</p>
+                    <p className="text-2xl font-bold text-gray-900">{errorStats?.today || 0}</p>
                     <p className="text-xs text-red-600 flex items-center mt-1">
                       <TrendingDown className="w-3 h-3 mr-1" />
-                      -8% this week
+                      Today's total
                     </p>
                   </div>
                 </div>
@@ -213,16 +246,25 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
             <CardDescription>Daily performance metrics over the past week</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={performanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="calls" stroke="#3b82f6" strokeWidth={2} name="Calls" />
-                <Line type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} name="Success Rate" />
-              </LineChart>
-            </ResponsiveContainer>
+            {performanceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={performanceData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="calls" stroke="#3b82f6" strokeWidth={2} name="Calls" />
+                  <Line type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} name="Success Rate" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                <div className="text-center">
+                  <Activity className="h-8 w-8 mx-auto mb-2" />
+                  <p>NO DATA AVAILABLE</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -232,25 +274,34 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
             <CardDescription>Breakdown of error types</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={errorDistribution}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  innerRadius={40}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
-                >
-                  {errorDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {errorDistribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={errorDistribution}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    innerRadius={40}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {errorDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                <div className="text-center">
+                  <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                  <p>NO DATA AVAILABLE</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -267,7 +318,7 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
           <CardContent>
             <div className="text-center">
               <p className="text-3xl font-bold text-blue-600">
-                {userRole === "employee" ? agentStats.avgDuration : teamStats.avgCallDuration}m
+                {userRole === "employee" ? (agentStats.avgCallDuration || 0) : (teamStats.avgCallDuration || 0)}m
               </p>
               <p className="text-sm text-gray-600 mt-2">Within optimal range</p>
               <Progress value={75} className="mt-4" />
@@ -285,9 +336,9 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <p className="text-3xl font-bold text-green-600">{agentStats.activeHours}h</p>
+                <p className="text-3xl font-bold text-green-600">{agentStats.activeHours || 0}h</p>
                 <p className="text-sm text-gray-600 mt-2">Out of 8 hours</p>
-                <Progress value={(agentStats.activeHours / 8) * 100} className="mt-4" />
+                <Progress value={((agentStats.activeHours || 0) / 8) * 100} className="mt-4" />
               </div>
             </CardContent>
           </Card>
@@ -298,26 +349,33 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
             <CardTitle>Performance Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Quality Score</span>
-                <Badge variant="outline" className="text-green-600 border-green-200">
-                  Excellent
-                </Badge>
+            {(agentProfile || errorStats) ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Quality Score</span>
+                  <Badge variant="outline" className="text-green-600 border-green-200">
+                    {(agentStats.successRate || 0) > 90 ? 'Excellent' : (agentStats.successRate || 0) > 80 ? 'Good' : 'Needs Improvement'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Efficiency</span>
+                  <Badge variant="outline" className="text-blue-600 border-blue-200">
+                    {(agentStats.callsCompleted || 0) > 40 ? 'Above Average' : (agentStats.callsCompleted || 0) > 20 ? 'Average' : 'Below Average'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Error Rate</span>
+                  <Badge variant="outline" className={(agentStats.errorCount || 0) < 3 ? "text-green-600 border-green-200" : (agentStats.errorCount || 0) < 5 ? "text-yellow-600 border-yellow-200" : "text-red-600 border-red-200"}>
+                    {(agentStats.errorCount || 0) < 3 ? 'Excellent' : (agentStats.errorCount || 0) < 5 ? 'Needs Attention' : 'High'}
+                  </Badge>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Efficiency</span>
-                <Badge variant="outline" className="text-blue-600 border-blue-200">
-                  Above Average
-                </Badge>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <Activity className="h-8 w-8 mx-auto mb-2" />
+                <p>NO DATA AVAILABLE</p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Error Rate</span>
-                <Badge variant="outline" className="text-yellow-600 border-yellow-200">
-                  Needs Attention
-                </Badge>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

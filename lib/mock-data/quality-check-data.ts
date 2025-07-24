@@ -61,7 +61,7 @@ export const flaggedCallsData: FlaggedCall[] = [
     agentId: "AGT_005",
     agentName: "Arjun Patel",
     callDate: new Date().toISOString().split('T')[0], // Today
-    videoUrl: "/placeholder.mp4",
+    videoUrl: "https://drive.google.com/file/d/1pns30RhCj8KvoLV8f9mNit84zRFlYrS8/view?usp=sharing",
     flags: [
       { type: "sop", description: "Did not state the full closing script.", timestamp: "04:15" },
       { type: "body_language", description: "Not wearing ID card.", timestamp: "00:10" },
@@ -74,7 +74,7 @@ export const flaggedCallsData: FlaggedCall[] = [
     agentId: "AGT_012",
     agentName: "Diya Verma",
     callDate: new Date().toISOString().split('T')[0], // Today
-    videoUrl: "/placeholder.mp4",
+    videoUrl: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
     flags: [{ type: "language", description: "Used unprofessional term 'yaar'.", timestamp: "02:30" }],
     status: "flag_approved",
     aiConfidence: 0.85,
@@ -124,7 +124,7 @@ export const flaggedCallsData: FlaggedCall[] = [
     agentId: "AGT_015",
     agentName: "Saanvi Agarwal",
     callDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Yesterday
-    videoUrl: "/placeholder.mp4",
+    videoUrl: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
     flags: [
       { type: "sop", description: "Failed to verify customer identity properly.", timestamp: "02:45" },
       { type: "language", description: "Used informal language with customer.", timestamp: "01:20" }
@@ -151,7 +151,7 @@ export const flaggedCallsData: FlaggedCall[] = [
     agentId: "AGT_018",
     agentName: "Kiara Pillai",
     callDate: new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString().split('T')[0], // 10th of current month
-    videoUrl: "/placeholder.mp4",
+    videoUrl: "https://drive.google.com/file/d/1X2Eraf2EEFAqEOXca5LAFxKCHymG0HcY/view?usp=sharing",
     flags: [{ type: "sop", description: "Did not follow proper document verification process.", timestamp: "04:30" }],
     status: "pending_review",
     aiConfidence: 0.55

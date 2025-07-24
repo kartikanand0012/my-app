@@ -52,6 +52,8 @@ import { AISubAgentTracker } from "./ai-subagent-tracker"
 import { QCScheduledReports } from "./qc-scheduled-reports"
 import { VideoUploadAnalyzer } from "./video-upload-analyzer"
 import { AITestConsole } from "./ai-test-console"
+import ReactMarkdown from 'react-markdown';
+import { AI_BACKEND_URL } from "@/lib/config";
 
 type DateFilterType = "all" | "today" | "yesterday" | "this_month" | "last_3_months" | "custom"
 
@@ -716,7 +718,138 @@ interface CallQueueTableProps {
   onReview: (call: FlaggedCall) => void
 }
 
+// Custom hook for AI summary polling
+function useAISummary(videoUrl: string | undefined) {
+  const [aiSummary, setAiSummary] = useState("");
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!videoUrl) return;
+    let polling = true;
+    let pollTimeout: NodeJS.Timeout | null = null;
+
+    async function fetchSummary() {
+      setAiSummary("");
+      setSummaryError(null);
+      setLoadingSummary(true);
+      try {
+        console.log("[useAISummary] Starting job for videoUrl:", videoUrl);
+        // 1. POST to /analyze
+        const res = await fetch(`${AI_BACKEND_URL}/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ video_link: videoUrl }),
+        });
+        if (!res.ok) throw new Error("Failed to start AI summary job");
+        const data = await res.json();
+        const jobId = data.job_id;
+        console.log("[useAISummary] Received job_id:", jobId);
+
+        // 2. Poll for result
+        async function poll() {
+          if (!polling) return;
+          try {
+            console.log(`[useAISummary] Polling for job_id: ${jobId}`);
+            const resultRes = await fetch(`${AI_BACKEND_URL}/result/${jobId}`);
+            if (!resultRes.ok) throw new Error("Failed to fetch AI summary result");
+            const resultData = await resultRes.json();
+            console.log(`[useAISummary] Poll result for job_id ${jobId}:`, resultData);
+            if (resultData.status === "pending" || resultData.status === "processing") {
+              pollTimeout = setTimeout(poll, 2000);
+            } else {
+              setAiSummary(resultData.summary || JSON.stringify(resultData));
+              setLoadingSummary(false);
+              polling = false;
+            }
+          } catch (err) {
+            setSummaryError("Error fetching summary result");
+            setLoadingSummary(false);
+            polling = false;
+            console.error("[useAISummary] Polling error:", err);
+          }
+        }
+        poll();
+      } catch (err) {
+        setSummaryError("Error starting summary job");
+        setLoadingSummary(false);
+        console.error("[useAISummary] Error starting job:", err);
+      }
+    }
+    fetchSummary();
+    return () => {
+      polling = false;
+      if (pollTimeout) clearTimeout(pollTimeout);
+    };
+  }, [videoUrl]);
+
+  return { aiSummary, loadingSummary, summaryError };
+}
+
 function CallQueueTable({ calls, onReview }: CallQueueTableProps) {
+  const [openVideo, setOpenVideo] = useState<FlaggedCall | null>(null)
+  // Only use the hook, do not declare any duplicate state
+  const { aiSummary, loadingSummary, summaryError } = useAISummary(openVideo?.videoUrl);
+
+  useEffect(() => {
+    let polling = true;
+    let pollTimeout: NodeJS.Timeout | null = null;
+
+    async function fetchSummary() {
+      setAiSummary("");
+      setSummaryError(null);
+      setLoadingSummary(true);
+
+      try {
+        // 1. POST to /analyze
+        const res = await fetch(`${AI_BACKEND_URL}/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ video_link: openVideo?.videoUrl }),
+        });
+        if (!res.ok) throw new Error("Failed to start AI summary job");
+        const data = await res.json();
+        const jobId = data.job_id;
+
+        // 2. Poll for result
+        async function poll() {
+          if (!polling) return;
+          try {
+            const resultRes = await fetch(`${AI_BACKEND_URL}/result/${jobId}`);
+            if (!resultRes.ok) throw new Error("Failed to fetch AI summary result");
+            const resultData = await resultRes.json();
+            if (resultData.status === "pending") {
+              // Try again in 2 seconds
+              pollTimeout = setTimeout(poll, 2000);
+            } else {
+              setAiSummary(resultData.summary || JSON.stringify(resultData));
+              setLoadingSummary(false);
+              polling = false;
+            }
+          } catch (err) {
+            setSummaryError("Error fetching summary result");
+            setLoadingSummary(false);
+            polling = false;
+          }
+        }
+        poll();
+      } catch (err) {
+        setSummaryError("Error starting summary job");
+        setLoadingSummary(false);
+      }
+    }
+
+    if (openVideo?.videoUrl) {
+      fetchSummary();
+    }
+
+    // Cleanup on unmount or when openVideo changes
+    return () => {
+      polling = false;
+      if (pollTimeout) clearTimeout(pollTimeout);
+    };
+  }, [openVideo]);
+
   const getFlagIcon = (type: "body_language" | "language" | "sop") => {
     switch (type) {
       case "body_language":
@@ -731,101 +864,198 @@ function CallQueueTable({ calls, onReview }: CallQueueTableProps) {
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Call ID</TableHead>
-          <TableHead>Agent</TableHead>
-          <TableHead>Flags Detected</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Review Call</TableHead>
-          <TableHead className="text-right">Action</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {calls.length > 0 ? (
-          calls.map((call) => (
-            <TableRow key={call.callId}>
-              <TableCell className="font-mono text-xs">{call.callId}</TableCell>
-              <TableCell className="font-medium">{call.agentName}</TableCell>
-              <TableCell>
-                <div className="flex flex-wrap gap-2">
-                  {call.flags.map((flag, index) => (
-                    <Badge key={index} variant="outline" className="capitalize">
-                      {getFlagIcon(flag.type)}
-                      <span className="ml-1">{flag.type.replace("_", " ")}</span>
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Call ID</TableHead>
+            <TableHead>Agent</TableHead>
+            <TableHead>Flags Detected</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Review Call</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {calls.length > 0 ? (
+            calls.map((call) => (
+              <TableRow key={call.callId}>
+                <TableCell className="font-mono text-xs">{call.callId}</TableCell>
+                <TableCell className="font-medium">{call.agentName}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-2">
+                    {call.flags.map((flag, index) => (
+                      <Badge key={index} variant="outline" className="capitalize">
+                        {getFlagIcon(flag.type)}
+                        <span className="ml-1">{flag.type.replace("_", " ")}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <Badge
+                      variant={
+                        call.status === "pending_review"
+                          ? "secondary"
+                          : call.status === "flag_approved"
+                            ? "default"
+                            : call.status === "flag_rejected"
+                              ? "outline"
+                              : "destructive"
+                      }
+                      className="capitalize"
+                    >
+                      {call.status === "flag_approved" ? "Approved" : 
+                       call.status === "flag_rejected" ? "Rejected" : 
+                       call.status.replace("_", " ")}
                     </Badge>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="space-y-1">
-                  <Badge
-                    variant={
-                      call.status === "pending_review"
-                        ? "secondary"
-                        : call.status === "flag_approved"
-                          ? "default"
-                          : call.status === "flag_rejected"
-                            ? "outline"
-                            : "destructive"
-                    }
-                    className="capitalize"
-                  >
-                    {call.status === "flag_approved" ? "Approved" : 
-                     call.status === "flag_rejected" ? "Rejected" : 
-                     call.status.replace("_", " ")}
-                  </Badge>
-                  {call.aiConfidence && (
-                    <div className="text-xs text-muted-foreground">
-                      AI Confidence: {(call.aiConfidence * 100).toFixed(0)}%
-                    </div>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => onReview(call)}
-                  aria-label={`Watch video for call ${call.callId}`}
-                >
-                  <Video className="w-4 h-4 mr-2" />
-                  Watch Video
-                </Button>
-              </TableCell>
-              <TableCell className="text-right">
-                {call.status === "flag_approved" && (
-                  <Badge variant="default" className="bg-green-100 text-green-800">
-                    ✓ Approved
-                  </Badge>
-                )}
-                {call.status === "flag_rejected" && (
-                  <Badge variant="outline" className="text-red-600 border-red-600">
-                    ✗ Rejected
-                  </Badge>
-                )}
-                {call.status === "pending_review" && (
+                    {call.aiConfidence && (
+                      <div className="text-xs text-muted-foreground">
+                        AI Confidence: {(call.aiConfidence * 100).toFixed(0)}%
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => onReview(call)}
-                    aria-label={`Review call ${call.callId}`}
+                    onClick={() => setOpenVideo(call)}
+                    aria-label={`Watch video for call ${call.callId}`}
                   >
-                    Review
+                    <Video className="w-4 h-4 mr-2" />
+                    Watch Video
                   </Button>
-                )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {call.status === "flag_approved" && (
+                    <Badge variant="default" className="bg-green-100 text-green-800">
+                      ✓ Approved
+                    </Badge>
+                  )}
+                  {call.status === "flag_rejected" && (
+                    <Badge variant="outline" className="text-red-600 border-red-600">
+                      ✗ Rejected
+                    </Badge>
+                  )}
+                  {call.status === "pending_review" && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => onReview(call)}
+                      aria-label={`Review call ${call.callId}`}
+                    >
+                      Review
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center h-24">
+                No calls match the current filters.
               </TableCell>
             </TableRow>
-          ))
-        ) : (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center h-24">
-              No calls match the current filters.
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+          )}
+        </TableBody>
+      </Table>
+      {openVideo && (
+        <Dialog open onOpenChange={() => setOpenVideo(null)}>
+          <DialogContent
+            style={{ width: '80vw', maxWidth: '80vw', height: '80vh', maxHeight: '80vh', padding: 0 }}
+            className="p-0"
+          >
+            <DialogHeader className="px-6 pt-6">
+              <DialogTitle>Call Video: {openVideo?.callId}</DialogTitle>
+              <DialogDescription>
+                Agent: {openVideo?.agentName} | Date: {openVideo?.callDate}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col md:flex-row gap-6 px-6 pb-6" style={{height: 'calc(80vh - 96px)'}}>
+              {/* Video Section */}
+              <div className="flex-1 min-w-[300px] max-w-[60%] bg-black flex items-center justify-center rounded-lg" style={{height: '100%'}}>
+                {openVideo?.videoUrl && (
+                  openVideo.videoUrl.includes("drive.google.com") ? (
+                    (() => {
+                      const match = openVideo.videoUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)
+                      const fileId = match ? match[1] : null
+                      const src = fileId ? `https://drive.google.com/file/d/${fileId}/preview` : ""
+                      return fileId ? (
+                        <iframe
+                          src={src}
+                          width="100%"
+                          height="100%"
+                          allow="autoplay"
+                          allowFullScreen
+                          style={{ border: 0, minHeight: '300px', minWidth: '300px', height: '100%', width: '100%', borderRadius: '0.5rem', background: 'black' }}
+                          title="Google Drive Video Preview"
+                        />
+                      ) : (
+                        <div className="text-white">Invalid Google Drive link</div>
+                      )
+                    })()
+                  ) : (
+                    <video
+                      src={openVideo.videoUrl}
+                      controls
+                      autoPlay
+                      className="w-full h-full rounded-lg"
+                      style={{ maxHeight: '100%', maxWidth: '100%' }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )
+                )}
+              </div>
+              {/* AI Summary Section */}
+              <div
+                className="flex-1 min-w-[250px] max-w-[40%] bg-gray-50 rounded-lg p-4 border overflow-auto"
+                style={{ maxHeight: '100%', minHeight: 0 }}
+              >
+                <h4 className="font-semibold mb-2">AI Summary Report</h4>
+                {loadingSummary && <div className="text-gray-500">Generating summary...</div>}
+                {summaryError && <div className="text-red-600">{summaryError}</div>}
+                {!loadingSummary && !summaryError && aiSummary && (
+                  (() => {
+                    let parsed: any = null;
+                    try {
+                      parsed = JSON.parse(aiSummary);
+                    } catch (e) {}
+                    if (parsed && typeof parsed === 'object' && (parsed.result || parsed.summary)) {
+                      const result = parsed.result || {};
+                      return (
+                        <div className="space-y-4 text-sm text-gray-800">
+                          {result.summary && (
+                            <div>
+                              <h5 className="font-bold mb-1">Summary</h5>
+                              <ReactMarkdown>{result.summary}</ReactMarkdown>
+                            </div>
+                          )}
+                          {result.mistakes && (
+                            <div>
+                              <h5 className="font-bold mb-1">Mistakes</h5>
+                              <ReactMarkdown>{result.mistakes}</ReactMarkdown>
+                            </div>
+                          )}
+                          {result.full_report && (
+                            <div>
+                              <h5 className="font-bold mb-1">Full Report</h5>
+                              <ReactMarkdown>{result.full_report}</ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return <div className="text-xs text-gray-700 bg-gray-100 p-2 rounded overflow-x-auto"><ReactMarkdown>{aiSummary}</ReactMarkdown></div>;
+                  })()
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   )
 }

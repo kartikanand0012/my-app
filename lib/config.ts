@@ -67,3 +67,5 @@ export const ENDPOINTS = {
     STATS: '/quality-check/stats',
   },
 };
+
+export const AI_BACKEND_URL = process.env.NEXT_PUBLIC_AI_BACKEND_URL || 'https://ai-vkyc-backend.onrender.com';

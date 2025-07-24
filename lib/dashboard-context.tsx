@@ -31,6 +31,7 @@ interface DashboardData {
   refreshErrorData: () => Promise<void>
   refreshAgentData: () => Promise<void>
   refreshDashboardStats: () => Promise<void>
+  loadErrorDetails: () => Promise<void>  // NEW: On-demand error details loading
 }
 
 const DashboardContext = createContext<DashboardData | null>(null)
@@ -91,42 +92,74 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     }
   }
 
-  // Fetch all error-related data
+  // Fetch all error-related data using NEW APIs
   const fetchErrorData = async () => {
     try {
       console.log('🔄 Fetching error analytics data...')
       
-      // Try each endpoint individually with error handling
-      const statsPromise = apiClient.getErrorStats('today').catch(err => {
+      // Use NEW error analysis APIs
+      const statsPromise = apiClient.getErrorStats().catch(err => {
         console.log('⚠️ Error stats failed:', err)
         return { success: false, data: null }
       })
       
-      const trendPromise = apiClient.getErrorTrend(7).catch(err => {
+      const trendPromise = apiClient.getErrorTrendsChart('30_days', 'daily').catch(err => {
         console.log('⚠️ Error trend failed:', err)
-        return { success: false, data: [] }
+        return { success: false, data: null }
       })
       
-      const typesPromise = apiClient.getErrorTypesDistribution('today').catch(err => {
-        console.log('⚠️ Error types failed:', err)
-        return { success: false, data: [] }
+      const agentRejectionPromise = apiClient.getAgentRejectionPieChart('this_month').catch(err => {
+        console.log('⚠️ Agent rejection pie chart failed:', err)
+        return { success: false, data: null }
       })
 
-      const [statsResponse, trendResponse, typesResponse] = await Promise.all([
-        statsPromise, trendPromise, typesPromise
+      const iaErrorTypesPromise = apiClient.getIAErrorTypesPieChart('this_month').catch(err => {
+        console.log('⚠️ IA error types pie chart failed:', err)
+        return { success: false, data: null }
+      })
+
+      const [statsResponse, trendResponse, agentRejectionResponse, iaErrorTypesResponse] = await Promise.all([
+        statsPromise, trendPromise, agentRejectionPromise, iaErrorTypesPromise
       ])
 
       console.log('📊 Error stats response:', statsResponse)
       console.log('📈 Error trend response:', trendResponse)
-      console.log('🥧 Error types response:', typesResponse)
+      console.log('🥧 Agent rejection response:', agentRejectionResponse)
+      console.log('🎯 IA error types response:', iaErrorTypesResponse)
 
       // Handle stats response
       if (statsResponse.success && statsResponse.data) {
-        setErrorStats(statsResponse.data)
+        setErrorStats({
+          total_errors: statsResponse.data.total_errors || 0,
+          today_errors: statsResponse.data.today_errors || 0,
+          agent_rejected: statsResponse.data.agent_rejected || 0,
+          ia_flagged: statsResponse.data.ia_flagged || 0,
+          acknowledged_errors: statsResponse.data.acknowledged_errors || 0,
+          daily_average: statsResponse.data.daily_average || 0,
+          error_rate: statsResponse.data.error_rate || 0,
+          active_agents: statsResponse.data.active_agents || 0,
+          // Legacy fields for backward compatibility
+          total: statsResponse.data.total_errors || 0,
+          today: statsResponse.data.today_errors || 0,
+          pending: statsResponse.data.today_errors || 0,
+          approved: 0,
+          acknowledged: statsResponse.data.acknowledged_errors || 0,
+          dailyAverage: statsResponse.data.daily_average || 0,
+          successRate: Math.max(0, 100 - (statsResponse.data.error_rate || 0))
+        })
         console.log('✅ Error stats loaded')
       } else {
         // Set default error stats structure
         setErrorStats({
+          total_errors: 0,
+          today_errors: 0,
+          agent_rejected: 0,
+          ia_flagged: 0,
+          acknowledged_errors: 0,
+          daily_average: 0,
+          error_rate: 0,
+          active_agents: 0,
+          // Legacy fields
           total: 0,
           today: 0,
           pending: 0,
@@ -139,28 +172,68 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
       }
 
       // Handle trend response
-      if (trendResponse.success && trendResponse.data && Array.isArray(trendResponse.data)) {
-        setErrorTrendData(trendResponse.data)
-        console.log('✅ Error trend loaded:', trendResponse.data.length, 'items')
+      if (trendResponse.success && trendResponse.data && trendResponse.data.chartData && Array.isArray(trendResponse.data.chartData)) {
+        // Transform the new API data format to the expected format
+        const transformedTrendData = trendResponse.data.chartData.map((item: any) => ({
+          date: item.date,
+          day: item.date,
+          calls: item.totalErrors || 0,
+          sessions: item.totalErrors || 0,
+          errors: item.totalErrors || 0,
+          errorCount: item.totalErrors || 0,
+          successRate: 100 - ((item.totalErrors / Math.max(item.totalErrors, 1)) * 100)
+        }))
+        setErrorTrendData(transformedTrendData)
+        console.log('✅ Error trend loaded:', transformedTrendData.length, 'items')
       } else {
         setErrorTrendData([])
         console.log('📈 Using empty error trend data')
       }
 
-      // Handle types response
-      if (typesResponse.success && typesResponse.data && Array.isArray(typesResponse.data)) {
-        setErrorTypesData(typesResponse.data)
-        console.log('✅ Error types loaded:', typesResponse.data.length, 'items')
-      } else {
-        setErrorTypesData([])
-        console.log('🥧 Using empty error types data')
+      // Combine agent rejection and IA error types for error distribution
+      const combinedErrorTypes = []
+      
+      // Add agent rejection data
+      if (agentRejectionResponse.success && agentRejectionResponse.data && agentRejectionResponse.data.chartData) {
+        const agentData = agentRejectionResponse.data.chartData.map((item: any) => ({
+          type: `Agent: ${item.category}`,
+          errorType: item.category,
+          count: item.count,
+          value: item.count,
+          percentage: item.percentage
+        }))
+        combinedErrorTypes.push(...agentData)
       }
+
+      // Add IA error types data
+      if (iaErrorTypesResponse.success && iaErrorTypesResponse.data && iaErrorTypesResponse.data.chartData) {
+        const iaData = iaErrorTypesResponse.data.chartData.map((item: any) => ({
+          type: `IA: ${item.category}`,
+          errorType: item.category,
+          count: item.count,
+          value: item.count,
+          percentage: item.percentage
+        }))
+        combinedErrorTypes.push(...iaData)
+      }
+
+      setErrorTypesData(combinedErrorTypes)
+      console.log('✅ Error types loaded:', combinedErrorTypes.length, 'items')
 
       return { success: true }
     } catch (err) {
       console.error('❌ Error fetching error data:', err)
       // Set default values instead of throwing
       setErrorStats({
+        total_errors: 0,
+        today_errors: 0,
+        agent_rejected: 0,
+        ia_flagged: 0,
+        acknowledged_errors: 0,
+        daily_average: 0,
+        error_rate: 0,
+        active_agents: 0,
+        // Legacy fields
         total: 0,
         today: 0,
         pending: 0,
@@ -175,23 +248,21 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     }
   }
 
-  // Fetch error details with basic filters
+  // Fetch error details using NEW detailed error list API
   const fetchErrorDetails = async () => {
     try {
       console.log('🔄 Fetching error details...')
-      const response = await apiClient.getErrorDetails({
-        date_range: 'today',
+      const response = await apiClient.getDetailedErrorList({
+        date_filter: 'today',
         page: 1,
         limit: 20
       })
       
       console.log('📋 Error details response:', response)
       
-      if (response.success && response.data) {
-        const errors = Array.isArray(response.data) ? response.data : 
-                      (response.data.errors && Array.isArray(response.data.errors)) ? response.data.errors : []
-        setErrorDetails(errors)
-        console.log('✅ Error details loaded:', errors.length, 'items')
+      if (response.success && response.data && response.data.errors && Array.isArray(response.data.errors)) {
+        setErrorDetails(response.data.errors)
+        console.log('✅ Error details loaded:', response.data.errors.length, 'items')
       } else {
         setErrorDetails([])
         console.log('📋 Using empty error details')
@@ -361,7 +432,7 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     }
   }
 
-  // Main data loading function
+  // Main data loading function - OPTIMIZED to reduce unnecessary API calls
   const loadAllData = async () => {
     if (!user) {
       console.log('⏳ No user available, skipping data load')
@@ -373,14 +444,31 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
       setError(null)
       console.log('🚀 Starting dashboard data load for user:', user.agent_name, 'role:', userRole)
       
-      // Load all data in parallel but handle failures gracefully
-      const results = await Promise.allSettled([
-        fetchDashboardStats(),
-        fetchErrorData(),
-        fetchErrorDetails(),
-        fetchAgentData(),
-        fetchAIReportingData()
-      ])
+      // OPTIMIZED: Only load data based on user role and current page needs
+      const loadTasks = []
+      
+      // Always load error data - needed for all roles and components
+      loadTasks.push(fetchErrorData())
+      
+      // Dashboard stats only for admin/team-lead
+      if (userRole !== 'agent') {
+        loadTasks.push(fetchDashboardStats())
+      }
+      
+      // Agent data based on role
+      loadTasks.push(fetchAgentData())
+      
+      // Error details only when needed (not on initial load)
+      // This will be loaded on-demand when user navigates to error analysis
+      // loadTasks.push(fetchErrorDetails())
+      
+      // AI reporting data only for admin/team-lead
+      if (userRole !== 'agent') {
+        loadTasks.push(fetchAIReportingData())
+      }
+
+      console.log(`🎯 Optimized loading: ${loadTasks.length} API calls for ${userRole} role`)
+      const results = await Promise.allSettled(loadTasks)
 
       console.log('📊 Data loading results:', results)
 
@@ -437,6 +525,17 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     }
   }
 
+  // NEW: On-demand error details loading for error analysis page
+  const loadErrorDetails = async () => {
+    try {
+      console.log('🔄 Loading error details on-demand...')
+      await fetchErrorDetails()
+      console.log('✅ Error details loaded')
+    } catch (err) {
+      console.error('❌ Error loading error details:', err)
+    }
+  }
+
   // Load data when component mounts or dependencies change
   useEffect(() => {
     loadAllData()
@@ -462,7 +561,8 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     // Refresh functions
     refreshErrorData,
     refreshAgentData,
-    refreshDashboardStats
+    refreshDashboardStats,
+    loadErrorDetails  // NEW: On-demand error details loading
   }
 
   return (

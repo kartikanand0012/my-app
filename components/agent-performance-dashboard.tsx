@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
+import { useDashboard } from "@/lib/dashboard-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -77,6 +78,13 @@ interface AgentData {
 
 export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSelect }: AgentPerformanceDashboardProps) {
   const { user } = useAuth()
+  const { 
+    agentProfile, 
+    leaderboard: contextLeaderboard, 
+    allAgents: contextAllAgents,
+    loading: contextLoading 
+  } = useDashboard()
+  
   const [agentData, setAgentData] = useState<AgentData | null>(null)
   const [dateRange, setDateRange] = useState("today")
   const [allAgents, setAllAgents] = useState<AgentData[]>([])
@@ -87,13 +95,43 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
   // Determine which agent to show data for
   const currentAgentId = selectedAgent || user?.agent_id?.toString() || ''
 
-  // Fetch agent profile data
+  // Fetch agent profile data (OPTIMIZED: use context data for current agent)
   const fetchAgentProfile = async () => {
     if (!currentAgentId) return
 
     try {
       setLoading(true)
       setError(null)
+      
+      // For agents viewing their own profile, use context data if available
+      if (userRole === 'agent' && agentProfile && agentProfile.id === currentAgentId) {
+        console.log('👤 Using agent profile from context')
+        setAgentData({
+          id: agentProfile.id,
+          name: agentProfile.name || user?.agent_name || 'Agent',
+          avatar: "/placeholder.svg?height=32&width=32",
+          rank: agentProfile.rank || 0,
+          todayStats: agentProfile.todayStats || {
+            callsCompleted: 0,
+            successRate: 0,
+            errorCount: 0,
+            avgCallDuration: 0,
+            breakTime: 0,
+            activeHours: 0
+          },
+          weeklyTrend: [],
+          hourlyCallsData: [],
+          monthlyStats: {
+            totalCalls: 0,
+            avgSuccessRate: 0,
+            totalErrors: 0,
+            improvement: 0
+          }
+        })
+        setLoading(false)
+        return
+      }
+      
       const response = await apiClient.getAgentProfile(currentAgentId, dateRange)
       
       if (response.success && response.data) {
@@ -172,8 +210,15 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
     }
   }
 
-  // Fetch leaderboard data
+  // Fetch leaderboard data (OPTIMIZED: use context data when available)
   const fetchLeaderboard = async () => {
+    // Use context data if available
+    if (contextLeaderboard && contextLeaderboard.length > 0) {
+      console.log('📊 Using leaderboard from context:', contextLeaderboard.length, 'items')
+      setLeaderboard(contextLeaderboard)
+      return
+    }
+
     try {
       const response = await apiClient.getLeaderboard(10, dateRange)
       if (response.success && response.data) {
@@ -186,9 +231,38 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
     }
   }
 
-  // Fetch all agents (for admin/team-lead)
+  // Fetch all agents (OPTIMIZED: use context data when available)
   const fetchAllAgents = async () => {
     if (userRole === 'agent') return
+
+    // Use context data if available
+    if (contextAllAgents && contextAllAgents.length > 0) {
+      console.log('👥 Using all agents from context:', contextAllAgents.length, 'items')
+      const agents = contextAllAgents.map((agent: any) => ({
+        id: agent.id || agent.agent_id,
+        name: agent.name || agent.agent_name,
+        avatar: agent.avatar || "/placeholder.svg?height=32&width=32",
+        rank: agent.rank || 0,
+        todayStats: agent.todayStats || {
+          callsCompleted: 0,
+          successRate: 0,
+          errorCount: 0,
+          avgCallDuration: 0,
+          breakTime: 0,
+          activeHours: 0
+        },
+        weeklyTrend: [],
+        hourlyCallsData: [],
+        monthlyStats: {
+          totalCalls: 0,
+          avgSuccessRate: 0,
+          totalErrors: 0,
+          improvement: 0
+        }
+      }))
+      setAllAgents(agents)
+      return
+    }
 
     try {
       const response = await apiClient.getAllAgents(dateRange)
@@ -223,15 +297,26 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
     }
   }
 
-  // Load all data when component mounts or key dependencies change
+  // OPTIMIZED: Load data based on user role and current needs
   useEffect(() => {
     if (user) {
+      console.log(`🎯 Loading performance data for ${userRole}, agent: ${currentAgentId}`)
+      
+      // Always fetch agent profile and leaderboard
       fetchAgentProfile()
-      fetchWeeklyTrend()
-      fetchHourlyCalls()
-      fetchMonthlyStats()
       fetchLeaderboard()
-      fetchAllAgents()
+      
+      // Fetch additional details only when needed
+      if (currentAgentId) {
+        fetchWeeklyTrend()
+        fetchHourlyCalls()
+        fetchMonthlyStats()
+      }
+      
+      // Fetch all agents only for admin/team-lead
+      if (userRole !== 'agent') {
+        fetchAllAgents()
+      }
     }
   }, [user, currentAgentId, dateRange])
 

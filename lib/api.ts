@@ -306,7 +306,15 @@ export async function createScheduledReport(reportData: {
   }
 }
 
-export async function updateScheduledReport(reportId: number, updates: { is_active?: boolean }) {
+export async function updateScheduledReport(reportId: number, updates: { 
+  is_active?: boolean;
+  report_type?: string;
+  schedule_time?: string;
+  schedule_days?: string;
+  teams_channel?: string;
+  tagged_users?: string[];
+  query_config?: any;
+}) {
   if (API_CONFIG.USE_MOCK_API) {
     return {
       success: true,
@@ -325,6 +333,117 @@ export async function updateScheduledReport(reportId: number, updates: { is_acti
     return response.data;
   } catch (error) {
     console.error('Error updating scheduled report:', error);
+    throw error;
+  }
+}
+
+export async function deleteScheduledReport(reportId: number) {
+  if (API_CONFIG.USE_MOCK_API) {
+    return {
+      success: true,
+      message: 'Scheduled report deleted successfully'
+    };
+  }
+
+  try {
+    const response = await apiClient.delete(`${ENDPOINTS.AI_AGENT.SCHEDULE}/${reportId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting scheduled report:', error);
+    throw error;
+  }
+}
+
+export async function toggleScheduler(enabled: boolean) {
+  if (API_CONFIG.USE_MOCK_API) {
+    return {
+      success: true,
+      message: `Scheduler ${enabled ? 'enabled' : 'disabled'} successfully`,
+      data: { enabled }
+    };
+  }
+
+  try {
+    const response = await apiClient.post(`${ENDPOINTS.AI_AGENT.SCHEDULER_TOGGLE}`, { enabled });
+    return response.data;
+  } catch (error) {
+    console.error('Error toggling scheduler:', error);
+    throw error;
+  }
+}
+
+export async function getSchedulerStatus() {
+  if (API_CONFIG.USE_MOCK_API) {
+    return {
+      success: true,
+      data: {
+        enabled: true,
+        active_tasks: 3,
+        tasks: [1, 2, 3]
+      }
+    };
+  }
+
+  try {
+    const response = await apiClient.get(`${ENDPOINTS.AI_AGENT.SCHEDULER_STATUS}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting scheduler status:', error);
+    throw error;
+  }
+}
+
+export async function exportReportAsCSV(reportType: string, parameters: any = {}) {
+  if (API_CONFIG.USE_MOCK_API) {
+    return new Blob(['mock,csv,data\n1,2,3'], { type: 'text/csv' });
+  }
+
+  try {
+    const response = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AI_AGENT.EXPORT_CSV}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+      },
+      body: JSON.stringify({
+        report_type: reportType,
+        parameters: parameters
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to export CSV');
+    }
+
+    return await response.blob();
+  } catch (error) {
+    console.error('Error exporting CSV:', error);
+    throw error;
+  }
+}
+
+export async function getPredefinedReportTemplates() {
+  if (API_CONFIG.USE_MOCK_API) {
+    return {
+      success: true,
+      data: {
+        templates: [
+          {
+            id: 'low_acceptance_agents',
+            name: 'Low Acceptance Rate Agents',
+            description: 'Agents with acceptance rate below 60%',
+            category: 'Performance'
+          }
+        ]
+      }
+    };
+  }
+
+  try {
+    const response = await apiClient.get(`${ENDPOINTS.AI_AGENT.REPORT_TEMPLATES}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting report templates:', error);
     throw error;
   }
 }

@@ -166,6 +166,47 @@ class ApiClient {
     return this.post(ENDPOINTS.ERROR_ANALYTICS.GENERATE_AI_REPORT, data);
   }
 
+  // ===== NEW ERROR ANALYSIS DASHBOARD APIs =====
+  async getDetailedErrorList(filters: {
+    page?: number;
+    limit?: number;
+    date_filter?: string;
+    error_type_filter?: string;
+    agent_id_filter?: string;
+    search?: string;
+  } = {}): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.set(key, value.toString());
+      }
+    });
+    const url = `${ENDPOINTS.ERROR_ANALYTICS.DETAILED_ERROR_LIST}${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.get(url);
+  }
+
+  async getAgentRejectionPieChart(dateRange?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ERROR_ANALYTICS.AGENT_REJECTION_PIE_CHART}${dateRange ? `?date_range=${dateRange}` : ''}`;
+    return this.get(url);
+  }
+
+  async getIAErrorTypesPieChart(dateRange?: string): Promise<ApiResponse<any>> {
+    const url = `${ENDPOINTS.ERROR_ANALYTICS.IA_ERROR_TYPES_PIE_CHART}${dateRange ? `?date_range=${dateRange}` : ''}`;
+    return this.get(url);
+  }
+
+  async getErrorTrendsChart(period?: string, chartType?: string): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (period) params.set('period', period);
+    if (chartType) params.set('chart_type', chartType);
+    const url = `${ENDPOINTS.ERROR_ANALYTICS.ERROR_TRENDS_CHART}${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.get(url);
+  }
+
+  async syncErrorAnalysisTable(): Promise<ApiResponse<any>> {
+    return this.post(ENDPOINTS.ERROR_ANALYTICS.SYNC_ERROR_ANALYSIS);
+  }
+
   // ===== DASHBOARD OVERVIEW APIs =====
   async getDashboardStats(): Promise<ApiResponse<any>> {
     return this.get(ENDPOINTS.AUTH.DASHBOARD_STATS);

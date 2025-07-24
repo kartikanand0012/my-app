@@ -81,7 +81,7 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
     totalCalls: dashboardStats?.sessions?.total_sessions || 0,
     callsToday: dashboardStats?.sessions?.sessions_today || 0,
     successRate: errorStats?.successRate || 0,
-    totalErrors: errorStats?.total || 0,
+    totalErrors: errorStats?.total_errors || errorStats?.total || 0,
     avgCallDuration: errorStats?.avgDuration || 0,
   }
 
@@ -225,7 +225,7 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                   <AlertTriangle className="w-8 h-8 text-red-600" />
                   <div>
                     <p className="text-sm font-medium text-gray-600">Errors Today</p>
-                    <p className="text-2xl font-bold text-gray-900">{errorStats?.today || 0}</p>
+                    <p className="text-2xl font-bold text-gray-900">{errorStats?.today_errors || errorStats?.today || 0}</p>
                     <p className="text-xs text-red-600 flex items-center mt-1">
                       <TrendingDown className="w-3 h-3 mr-1" />
                       Today's total

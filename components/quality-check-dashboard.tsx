@@ -788,67 +788,7 @@ function useAISummary(videoUrl: string | undefined) {
 
 function CallQueueTable({ calls, onReview }: CallQueueTableProps) {
   const [openVideo, setOpenVideo] = useState<FlaggedCall | null>(null)
-  // Only use the hook, do not declare any duplicate state
   const { aiSummary, loadingSummary, summaryError } = useAISummary(openVideo?.videoUrl);
-
-  useEffect(() => {
-    let polling = true;
-    let pollTimeout: NodeJS.Timeout | null = null;
-
-    async function fetchSummary() {
-      setAiSummary("");
-      setSummaryError(null);
-      setLoadingSummary(true);
-
-      try {
-        // 1. POST to /analyze
-        const res = await fetch(`${AI_BACKEND_URL}/analyze`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ video_link: openVideo?.videoUrl }),
-        });
-        if (!res.ok) throw new Error("Failed to start AI summary job");
-        const data = await res.json();
-        const jobId = data.job_id;
-
-        // 2. Poll for result
-        async function poll() {
-          if (!polling) return;
-          try {
-            const resultRes = await fetch(`${AI_BACKEND_URL}/result/${jobId}`);
-            if (!resultRes.ok) throw new Error("Failed to fetch AI summary result");
-            const resultData = await resultRes.json();
-            if (resultData.status === "pending") {
-              // Try again in 2 seconds
-              pollTimeout = setTimeout(poll, 2000);
-            } else {
-              setAiSummary(resultData.summary || JSON.stringify(resultData));
-              setLoadingSummary(false);
-              polling = false;
-            }
-          } catch (err) {
-            setSummaryError("Error fetching summary result");
-            setLoadingSummary(false);
-            polling = false;
-          }
-        }
-        poll();
-      } catch (err) {
-        setSummaryError("Error starting summary job");
-        setLoadingSummary(false);
-      }
-    }
-
-    if (openVideo?.videoUrl) {
-      fetchSummary();
-    }
-
-    // Cleanup on unmount or when openVideo changes
-    return () => {
-      polling = false;
-      if (pollTimeout) clearTimeout(pollTimeout);
-    };
-  }, [openVideo]);
 
   const getFlagIcon = (type: "body_language" | "language" | "sop") => {
     switch (type) {

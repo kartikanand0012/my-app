@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { apiClient } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
+import { useDashboard } from "@/lib/dashboard-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -74,137 +77,320 @@ interface AgentData {
 }
 
 export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSelect }: AgentPerformanceDashboardProps) {
+  const { user } = useAuth()
+  const { 
+    agentProfile, 
+    leaderboard: contextLeaderboard, 
+    allAgents: contextAllAgents,
+    loading: contextLoading 
+  } = useDashboard()
+  
   const [agentData, setAgentData] = useState<AgentData | null>(null)
   const [dateRange, setDateRange] = useState("today")
   const [allAgents, setAllAgents] = useState<AgentData[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    // Generate sample leaderboard data
-    const generateLeaderboard = (): LeaderboardEntry[] => [
-      {
-        rank: 1,
-        id: "AGT_005",
-        name: "Vikram Singh",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2450,
-        successRate: 98.0,
-        callsCompleted: 49,
-        trend: "up",
-      },
-      {
-        rank: 2,
-        id: "AGT_002",
-        name: "Priya Sharma",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2380,
-        successRate: 96.2,
-        callsCompleted: 52,
-        trend: "up",
-      },
-      {
-        rank: 3,
-        id: "AGT_004",
-        name: "Sneha Reddy",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2290,
-        successRate: 93.2,
-        callsCompleted: 44,
-        trend: "stable",
-      },
-      {
-        rank: 4,
-        id: "AGT_001",
-        name: "Rajesh Kumar",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2180,
-        successRate: 89.4,
-        callsCompleted: 47,
-        trend: "up",
-      },
-      {
-        rank: 5,
-        id: "AGT_003",
-        name: "Amit Patel",
-        avatar: "/placeholder.svg?height=32&width=32",
-        score: 2050,
-        successRate: 82.1,
-        callsCompleted: 38,
-        trend: "down",
-      },
-    ]
+  // Determine which agent to show data for
+  const currentAgentId = selectedAgent || user?.agent_id?.toString() || ''
 
-    // Generate sample agent data based on date range
-    const generateAgentData = (agentId: string): AgentData => {
-      const baseData = {
-        id: agentId,
-        name: agentId === "AGT_001" ? "Rajesh Kumar" : "Current User",
-        avatar: "/placeholder.svg?height=32&width=32",
-        rank: 4,
-        todayStats: {
-          callsCompleted: dateRange === "today" ? 47 : dateRange === "yesterday" ? 52 : 245,
-          successRate: 89.4,
-          errorCount: dateRange === "today" ? 3 : dateRange === "yesterday" ? 2 : 15,
-          avgCallDuration: 8.2,
-          breakTime: 45,
-          activeHours: 7.5,
-        },
-        weeklyTrend: [
-          { day: "Mon", calls: 52, successRate: 91.2, errors: 2 },
-          { day: "Tue", calls: 48, successRate: 87.5, errors: 4 },
-          { day: "Wed", calls: 51, successRate: 92.1, errors: 1 },
-          { day: "Thu", calls: 49, successRate: 88.8, errors: 3 },
-          { day: "Fri", calls: 47, successRate: 89.4, errors: 3 },
-        ],
-        hourlyCallsData: [
-          { hour: "09:00", calls: 6, loginTime: "09:00", logoutTime: null },
-          { hour: "10:00", calls: 8, loginTime: null, logoutTime: null },
-          { hour: "11:00", calls: 7, loginTime: null, logoutTime: null },
-          { hour: "12:00", calls: 4, loginTime: null, logoutTime: null },
-          { hour: "13:00", calls: 3, loginTime: null, logoutTime: null },
-          { hour: "14:00", calls: 6, loginTime: null, logoutTime: null },
-          { hour: "15:00", calls: 8, loginTime: null, logoutTime: null },
-          { hour: "16:00", calls: 5, loginTime: null, logoutTime: "17:00" },
-        ],
-        monthlyStats: {
-          totalCalls: 1247,
-          avgSuccessRate: 89.8,
-          totalErrors: 67,
-          improvement: 2.3,
-        },
+  // Fetch agent profile data (OPTIMIZED: use context data for current agent)
+  const fetchAgentProfile = async () => {
+    if (!currentAgentId) return
+
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // For agents viewing their own profile, use context data if available
+      if (userRole === 'agent' && agentProfile && agentProfile.id === currentAgentId) {
+        console.log('👤 Using agent profile from context')
+        setAgentData({
+          id: agentProfile.id,
+          name: agentProfile.name || user?.agent_name || 'Agent',
+          avatar: "/placeholder.svg?height=32&width=32",
+          rank: agentProfile.rank || 0,
+          todayStats: agentProfile.todayStats || {
+            callsCompleted: 0,
+            successRate: 0,
+            errorCount: 0,
+            avgCallDuration: 0,
+            breakTime: 0,
+            activeHours: 0
+          },
+          weeklyTrend: [],
+          hourlyCallsData: [],
+          monthlyStats: {
+            totalCalls: 0,
+            avgSuccessRate: 0,
+            totalErrors: 0,
+            improvement: 0
+          }
+        })
+        setLoading(false)
+        return
       }
+      
+      const response = await apiClient.getAgentProfile(currentAgentId, dateRange)
+      
+      if (response.success && response.data) {
+        // Transform API data to component format
+        const profileData = response.data
+        setAgentData({
+          id: profileData.id,
+          name: profileData.name,
+          avatar: "/placeholder.svg?height=32&width=32",
+          rank: profileData.rank || 0,
+          todayStats: profileData.todayStats || {
+            callsCompleted: 0,
+            successRate: 0,
+            errorCount: 0,
+            avgCallDuration: 0,
+            breakTime: 0,
+            activeHours: 0
+          },
+          weeklyTrend: [],
+          hourlyCallsData: [],
+          monthlyStats: {
+            totalCalls: 0,
+            avgSuccessRate: 0,
+            totalErrors: 0,
+            improvement: 0
+          }
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching agent profile:', err)
+      setError('Failed to load agent profile data')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-      return baseData
+  // Fetch weekly trend data
+  const fetchWeeklyTrend = async () => {
+    if (!currentAgentId) return
+
+    try {
+      const response = await apiClient.getAgentWeeklyTrend(currentAgentId, dateRange)
+      if (response.success && response.data) {
+        setAgentData(prev => prev ? { ...prev, weeklyTrend: response.data } : null)
+      }
+    } catch (err) {
+      console.error('Error fetching weekly trend:', err)
+    }
+  }
+
+  // Fetch hourly calls data
+  const fetchHourlyCalls = async () => {
+    if (!currentAgentId) return
+
+    try {
+      const response = await apiClient.getAgentHourlyCalls(currentAgentId)
+      if (response.success && response.data) {
+        setAgentData(prev => prev ? { ...prev, hourlyCallsData: response.data } : null)
+      }
+    } catch (err) {
+      console.error('Error fetching hourly calls:', err)
+    }
+  }
+
+  // Fetch monthly stats
+  const fetchMonthlyStats = async () => {
+    if (!currentAgentId) return
+
+    try {
+      const response = await apiClient.getAgentMonthlyStats(currentAgentId)
+      if (response.success && response.data) {
+        setAgentData(prev => prev ? { ...prev, monthlyStats: response.data } : null)
+      }
+    } catch (err) {
+      console.error('Error fetching monthly stats:', err)
+    }
+  }
+
+  // Fetch leaderboard data (OPTIMIZED: use context data when available)
+  const fetchLeaderboard = async () => {
+    // Use context data if available
+    if (contextLeaderboard && contextLeaderboard.length > 0) {
+      console.log('📊 Using leaderboard from context:', contextLeaderboard.length, 'items')
+      setLeaderboard(contextLeaderboard)
+      return
     }
 
-    setLeaderboard(generateLeaderboard())
+    try {
+      const response = await apiClient.getLeaderboard(10, dateRange)
+      if (response.success && response.data) {
+        setLeaderboard(response.data)
+      }
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err)
+      // Keep empty array as fallback to show NO DATA AVAILABLE
+      setLeaderboard([])
+    }
+  }
 
-    // Set agent data based on role and selection
-    if (userRole === "agent") {
-      setAgentData(generateAgentData("default"))
-    } else if (selectedAgent) {
-      setAgentData(generateAgentData(selectedAgent))
-    } else {
-      setAgentData(generateAgentData("AGT_001"))
+  // Fetch all agents (OPTIMIZED: use context data when available)
+  const fetchAllAgents = async () => {
+    if (userRole === 'agent') return
+
+    // Use context data if available
+    if (contextAllAgents && contextAllAgents.length > 0) {
+      console.log('👥 Using all agents from context:', contextAllAgents.length, 'items')
+      const agents = contextAllAgents.map((agent: any) => ({
+        id: agent.id || agent.agent_id,
+        name: agent.name || agent.agent_name,
+        avatar: agent.avatar || "/placeholder.svg?height=32&width=32",
+        rank: agent.rank || 0,
+        todayStats: agent.todayStats || {
+          callsCompleted: 0,
+          successRate: 0,
+          errorCount: 0,
+          avgCallDuration: 0,
+          breakTime: 0,
+          activeHours: 0
+        },
+        weeklyTrend: [],
+        hourlyCallsData: [],
+        monthlyStats: {
+          totalCalls: 0,
+          avgSuccessRate: 0,
+          totalErrors: 0,
+          improvement: 0
+        }
+      }))
+      setAllAgents(agents)
+      return
     }
 
-    // Generate all agents list for selection
-    const allAgentsData = [
-      generateAgentData("AGT_001"),
-      generateAgentData("AGT_002"),
-      generateAgentData("AGT_003"),
-      generateAgentData("AGT_004"),
-      generateAgentData("AGT_005"),
-    ]
-    setAllAgents(allAgentsData)
-  }, [userRole, selectedAgent, dateRange])
+    try {
+      const response = await apiClient.getAllAgents(dateRange)
+      if (response.success && response.data) {
+        const agents = response.data.map((agent: any) => ({
+          id: agent.id,
+          name: agent.name,
+          avatar: agent.avatar || "/placeholder.svg?height=32&width=32",
+          rank: agent.rank || 0,
+          todayStats: agent.todayStats || {
+            callsCompleted: 0,
+            successRate: 0,
+            errorCount: 0,
+            avgCallDuration: 0,
+            breakTime: 0,
+            activeHours: 0
+          },
+          weeklyTrend: [],
+          hourlyCallsData: [],
+          monthlyStats: {
+            totalCalls: 0,
+            avgSuccessRate: 0,
+            totalErrors: 0,
+            improvement: 0
+          }
+        }))
+        setAllAgents(agents)
+      }
+    } catch (err) {
+      console.error('Error fetching all agents:', err)
+      setAllAgents([])
+    }
+  }
 
-  if (!agentData) return <div>Loading...</div>
+  // OPTIMIZED: Load data based on user role and current needs
+  useEffect(() => {
+    if (user) {
+      console.log(`🎯 Loading performance data for ${userRole}, agent: ${currentAgentId}`)
+      
+      // Always fetch agent profile and leaderboard
+      fetchAgentProfile()
+      fetchLeaderboard()
+      
+      // Fetch additional details only when needed
+      if (currentAgentId) {
+        fetchWeeklyTrend()
+        fetchHourlyCalls()
+        fetchMonthlyStats()
+      }
+      
+      // Fetch all agents only for admin/team-lead
+      if (userRole !== 'agent') {
+        fetchAllAgents()
+      }
+    }
+  }, [user, currentAgentId, dateRange])
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="p-8 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Loading performance data...</p>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <div className="text-red-600 mb-4">
+          <XCircle className="h-8 w-8 mx-auto mb-2" />
+          <p className="text-lg font-semibold">Error Loading Data</p>
+          <p className="text-sm">{error}</p>
+        </div>
+        <button 
+          onClick={() => {
+            setError(null)
+            fetchAgentProfile()
+          }}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Try Again
+        </button>
+      </div>
+    )
+  }
+
+  // Show NO DATA AVAILABLE if no agent data
+  if (!agentData) {
+    return (
+      <div className="p-8 text-center">
+        <div className="text-gray-600">
+          <Activity className="h-8 w-8 mx-auto mb-2" />
+          <p className="text-lg font-semibold">NO DATA AVAILABLE</p>
+          <p className="text-sm">No performance data found for the selected agent.</p>
+        </div>
+      </div>
+    )
+  }
 
   const currentAgentRank = leaderboard.find((entry) => entry.id === agentData.id)?.rank || agentData.rank
 
   return (
     <div className="space-y-6">
+      {/* Agent Profile Header */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Avatar className="w-16 h-16">
+                <AvatarImage src={agentData.avatar || "/placeholder.svg"} />
+                <AvatarFallback>
+                  {agentData.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h2 className="text-2xl font-bold">{agentData.name}</h2>
+                <p className="text-gray-600">VKYC Specialist • Rank #{currentAgentRank}</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       {/* Date Range Control */}
       <Card>
         <CardContent className="p-4">
@@ -268,28 +454,7 @@ export function AgentPerformanceDashboard({ userRole, selectedAgent, onAgentSele
         </Card>
       )}
 
-      {/* Agent Profile Header */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Avatar className="w-16 h-16">
-                <AvatarImage src={agentData.avatar || "/placeholder.svg"} />
-                <AvatarFallback>
-                  {agentData.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h2 className="text-2xl font-bold">{agentData.name}</h2>
-                <p className="text-gray-600">VKYC Specialist • Rank #{currentAgentRank}</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      
 
       {/* Performance Metrics - Fixed to show 6 cards including Active Hours */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">

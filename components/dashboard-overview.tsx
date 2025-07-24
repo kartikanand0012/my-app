@@ -27,7 +27,9 @@ import {
   PieChart,
   Pie,
   Cell,
+  Sector,
 } from "recharts"
+import { DonutChart } from "@/components/ui/donut-chart";
 
 interface DashboardOverviewProps {
   userRole: "admin" | "team-lead" | "employee"
@@ -39,6 +41,8 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
     errorStats,
     errorTrendData,
     errorTypesData,
+    agentErrorTypesData, // new
+    iaErrorTypesData, // new
     agentProfile,
     loading,
     error
@@ -116,10 +120,79 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
     color: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'][index % 5]
   }))
 
+  // Separate agent and IA error types for pie charts
+  const agentErrorDistribution = agentErrorTypesData.map((item, index) => ({
+    name: item.type || item.errorType,
+    value: item.count || item.value,
+    color: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'][index % 5]
+  }))
+  const iaErrorDistribution = iaErrorTypesData.map((item, index) => ({
+    name: item.type || item.errorType,
+    value: item.count || item.value,
+    color: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'][index % 5]
+  }))
+
+  // Custom label renderer for Pie chart with leader line and box
+  const renderBoxedLabel = ({
+    cx, cy, midAngle, outerRadius, name, value
+  }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 20;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    // Box dimensions
+    const boxPadding = 6;
+    const text = `${name}: ${value}`;
+    const fontSize = 13;
+    // Estimate text width (for monospace or short labels, otherwise use a ref for real width)
+    const textWidth = text.length * (fontSize * 0.6);
+    const textHeight = fontSize + 4;
+
+    // Leader line start (from arc edge)
+    const sx = cx + outerRadius * Math.cos(-midAngle * RADIAN);
+    const sy = cy + outerRadius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <g>
+        {/* Leader line */}
+        <polyline
+          points={`${sx},${sy} ${x},${y}`}
+          stroke="#333"
+          fill="none"
+        />
+        {/* Label box */}
+        <rect
+          x={x - textWidth / 2 - boxPadding}
+          y={y - textHeight / 2 - boxPadding}
+          width={textWidth + boxPadding * 2}
+          height={textHeight + boxPadding * 2}
+          fill="#fff"
+          stroke="#333"
+          rx={4}
+          ry={4}
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.04))' }}
+        />
+        {/* Label text */}
+        <text
+          x={x}
+          y={y}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={fontSize}
+          fill="#333"
+          fontWeight={500}
+        >
+          {text}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {userRole === "employee" ? (
           <>
             <Card>
@@ -266,28 +339,12 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                 </div>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-8 h-8 text-purple-600" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Average TAT</p>
-                    <p className="text-2xl font-bold text-gray-900">{errorStats?.avg_duration_minutes || 0} min</p>
-                    <p className="text-xs text-purple-600 flex items-center mt-1">
-                      <Clock className="w-3 h-3 mr-1" />
-                      Avg turnaround
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </>
         )}
       </div>
 
-      {/* Performance Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Performance Chart Full Width */}
+      <div className="w-full mb-6">
         <Card>
           <CardHeader>
             <CardTitle>{userRole === "employee" ? "My Performance Trend" : "Team Performance Trend"}</CardTitle>
@@ -309,7 +366,6 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
                   />
                   <Line type="monotone" dataKey="calls" stroke="#3b82f6" strokeWidth={2} name="Total Calls" />
                   <Line type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} name="Success Rate" />
-                  
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -322,117 +378,34 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Error Distribution</CardTitle>
-            <CardDescription>Breakdown of error types</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {errorDistribution.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={errorDistribution}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    innerRadius={40}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {errorDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[300px] text-gray-500">
-                <div className="text-center">
-                  <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
-                  <p>NO DATA AVAILABLE</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Additional Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Clock className="w-5 h-5" />
-              <span>Average TAT(Turn Around Time)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-blue-600">
-                {dashboardStats?.performance?.avg_duration_minutes || 0}m
-              </p>
-              <p className="text-sm text-gray-600 mt-2">Within optimal range</p>
-              <Progress value={75} className="mt-4" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {userRole === "employee" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Activity className="w-5 h-5" />
-                <span>Active Hours Today</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <p className="text-3xl font-bold text-green-600">{agentStats.activeHours || 0}h</p>
-                <p className="text-sm text-gray-600 mt-2">Out of 8 hours</p>
-                <Progress value={((agentStats.activeHours || 0) / 8) * 100} className="mt-4" />
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(agentProfile || errorStats) ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Quality Score</span>
-                  <Badge variant="outline" className="text-green-600 border-green-200">
-                    {(agentStats.successRate || 0) > 90 ? 'Excellent' : (agentStats.successRate || 0) > 80 ? 'Good' : 'Needs Improvement'}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Efficiency</span>
-                  <Badge variant="outline" className="text-blue-600 border-blue-200">
-                    {(agentStats.callsCompleted || 0) > 40 ? 'Above Average' : (agentStats.callsCompleted || 0) > 20 ? 'Average' : 'Below Average'}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Error Rate</span>
-                  <Badge variant="outline" className={(agentStats.errorCount || 0) < 3 ? "text-green-600 border-green-200" : (agentStats.errorCount || 0) < 5 ? "text-yellow-600 border-yellow-200" : "text-red-600 border-red-200"}>
-                    {(agentStats.errorCount || 0) < 3 ? 'Excellent' : (agentStats.errorCount || 0) < 5 ? 'Needs Attention' : 'High'}
-                  </Badge>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-4 text-gray-500">
-                <Activity className="h-8 w-8 mx-auto mb-2" />
-                <p>NO DATA AVAILABLE</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Donut Charts Row */}
+      {/* Responsive grid: 2 columns if <=4, 3 columns if >4 charts */}
+      <div
+        className={`w-full grid gap-6
+          ${[agentErrorDistribution, iaErrorDistribution].length > 4 ? 'md:grid-cols-3' : 'md:grid-cols-2'}
+          grid-cols-1
+        `}
+      >
+        <div className="flex flex-col items-stretch">
+          <DonutChart
+            data={agentErrorDistribution}
+            title="Agent Error Types"
+            description="Breakdown of agent rejection error types"
+            height={110}
+            alignLeft={true}
+          />
+        </div>
+        <div className="flex flex-col items-stretch">
+          <DonutChart
+            data={iaErrorDistribution}
+            title="IA Error Types"
+            description="Breakdown of IA error types"
+            height={110}
+            alignLeft={true}
+          />
+        </div>
       </div>
     </div>
   )

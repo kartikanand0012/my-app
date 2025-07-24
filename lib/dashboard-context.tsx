@@ -13,6 +13,8 @@ interface DashboardData {
   errorTrendData: any[]
   errorTypesData: any[]
   errorDetails: any[]
+  agentErrorTypesData: any[] // new
+  iaErrorTypesData: any[] // new
   
   // Agent data
   agentProfile: any
@@ -63,6 +65,10 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
   // AI reporting data states
   const [savedQueries, setSavedQueries] = useState<any[]>([])
   const [scheduledReports, setScheduledReports] = useState<any[]>([])
+
+  // New error types data states
+  const [agentErrorTypesData, setAgentErrorTypesData] = useState<any[]>([])
+  const [iaErrorTypesData, setIAErrorTypesData] = useState<any[]>([])
 
   // Current agent ID for employee role
   const currentAgentId = user?.agent_id?.toString() || ''
@@ -214,34 +220,31 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
       }
 
       // Combine agent rejection and IA error types for error distribution
-      const combinedErrorTypes = []
-      
-      // Add agent rejection data
+      // Agent rejection error types (separate)
+      let agentErrorTypes: any[] = []
       if (agentRejectionResponse.success && agentRejectionResponse.data && agentRejectionResponse.data.chartData) {
-        const agentData = agentRejectionResponse.data.chartData.map((item: any) => ({
+        agentErrorTypes = agentRejectionResponse.data.chartData.map((item: any) => ({
           type: `Agent: ${item.category}`,
           errorType: item.category,
           count: item.count,
           value: item.count,
           percentage: item.percentage
         }))
-        combinedErrorTypes.push(...agentData)
       }
+      setAgentErrorTypesData(agentErrorTypes)
 
-      // Add IA error types data
+      // IA error types (separate)
+      let iaErrorTypes: any[] = []
       if (iaErrorTypesResponse.success && iaErrorTypesResponse.data && iaErrorTypesResponse.data.chartData) {
-        const iaData = iaErrorTypesResponse.data.chartData.map((item: any) => ({
+        iaErrorTypes = iaErrorTypesResponse.data.chartData.map((item: any) => ({
           type: `IA: ${item.category}`,
           errorType: item.category,
           count: item.count,
           value: item.count,
           percentage: item.percentage
         }))
-        combinedErrorTypes.push(...iaData)
       }
-
-      setErrorTypesData(combinedErrorTypes)
-      console.log('✅ Error types loaded:', combinedErrorTypes.length, 'items')
+      setIAErrorTypesData(iaErrorTypes)
 
       return { success: true }
     } catch (err) {
@@ -266,7 +269,8 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
         successRate: 0
       })
       setErrorTrendData([])
-      setErrorTypesData([])
+      setAgentErrorTypesData([])
+      setIAErrorTypesData([])
       return { success: true } // Don't fail completely
     }
   }
@@ -570,7 +574,9 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     dashboardStats,
     errorStats,
     errorTrendData,
-    errorTypesData,
+    errorTypesData, // (legacy, keep for backward compatibility if needed)
+    agentErrorTypesData, // new
+    iaErrorTypesData, // new
     errorDetails,
     agentProfile,
     leaderboard,

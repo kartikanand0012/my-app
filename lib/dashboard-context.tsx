@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 
@@ -97,9 +97,12 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     try {
       console.log('🔄 Fetching error analytics data...')
       
-      // Use NEW error analysis APIs
-      const statsPromise = apiClient.getErrorStats().catch(err => {
-        console.log('⚠️ Error stats failed:', err)
+      // Use dashboard stats for main statistics, fallback to error stats if needed
+      const statsPromise = (userRole !== 'agent' ? 
+        apiClient.getDashboardStats() : 
+        apiClient.getErrorStats()
+      ).catch(err => {
+        console.log('⚠️ Dashboard/Error stats failed:', err)
         return { success: false, data: null }
       })
       
@@ -127,26 +130,55 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
       console.log('🥧 Agent rejection response:', agentRejectionResponse)
       console.log('🎯 IA error types response:', iaErrorTypesResponse)
 
-      // Handle stats response
+      // Handle stats response - check if it's the new dashboard stats format
       if (statsResponse.success && statsResponse.data) {
-        setErrorStats({
-          total_errors: statsResponse.data.total_errors || 0,
-          today_errors: statsResponse.data.today_errors || 0,
-          agent_rejected: statsResponse.data.agent_rejected || 0,
-          ia_flagged: statsResponse.data.ia_flagged || 0,
-          acknowledged_errors: statsResponse.data.acknowledged_errors || 0,
-          daily_average: statsResponse.data.daily_average || 0,
-          error_rate: statsResponse.data.error_rate || 0,
-          active_agents: statsResponse.data.active_agents || 0,
-          // Legacy fields for backward compatibility
-          total: statsResponse.data.total_errors || 0,
-          today: statsResponse.data.today_errors || 0,
-          pending: statsResponse.data.today_errors || 0,
-          approved: 0,
-          acknowledged: statsResponse.data.acknowledged_errors || 0,
-          dailyAverage: statsResponse.data.daily_average || 0,
-          successRate: Math.max(0, 100 - (statsResponse.data.error_rate || 0))
-        })
+        const data = statsResponse.data
+        
+        // Check if this is the new dashboard stats format with performance data
+        if (data.performance && data.sessions) {
+          setErrorStats({
+            // New format from dashboard-stats
+            total_errors: (data.performance.rejected_today || 0) + (data.performance.flagged_critical || 0),
+            today_errors: (data.performance.rejected_today || 0) + (data.performance.flagged_critical || 0),
+            sessions_today: data.sessions.sessions_today || 0, 
+            agent_rejected: data.performance.rejected_today || 0,
+            ia_flagged: data.performance.flagged_critical || 0,
+            acknowledged_errors: data.performance.approved_today || 0,
+            daily_average: 0, // Will be calculated if needed
+            error_rate: 100 - (data.performance.approval_rate || 0),
+            approval_rate: data.performance.approval_rate || 0,
+            avg_duration_minutes: data.performance.avg_duration_minutes || 0,
+            active_agents: data.agents?.active_agents || 0,
+            // Legacy fields for backward compatibility
+            total: (data.performance.rejected_today || 0) + (data.performance.flagged_critical || 0),
+            today: data.sessions.sessions_today || 0,
+            pending: data.performance.rejected_today || 0,
+            approved: data.performance.approved_today || 0,
+            acknowledged: data.performance.approved_today || 0,
+            dailyAverage: 0,
+            successRate: data.performance.approval_rate || 0
+          })
+        } else {
+          // Original error-analytics format
+          setErrorStats({
+            total_errors: data.total_errors || 0,
+            today_errors: data.today_errors || 0,
+            agent_rejected: data.agent_rejected || 0,
+            ia_flagged: data.ia_flagged || 0,
+            acknowledged_errors: data.acknowledged_errors || 0,
+            daily_average: data.daily_average || 0,
+            error_rate: data.error_rate || 0,
+            active_agents: data.active_agents || 0,
+            // Legacy fields for backward compatibility
+            total: data.total_errors || 0,
+            today: data.today_errors || 0,
+            pending: data.today_errors || 0,
+            approved: 0,
+            acknowledged: data.acknowledged_errors || 0,
+            dailyAverage: data.daily_average || 0,
+            successRate: Math.max(0, 100 - (data.error_rate || 0))
+          })
+        }
         console.log('✅ Error stats loaded')
       } else {
         // Set default error stats structure
@@ -171,20 +203,11 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
         console.log('📊 Using default error stats')
       }
 
-      // Handle trend response
+      // Handle trend response - keep original format from new API
       if (trendResponse.success && trendResponse.data && trendResponse.data.chartData && Array.isArray(trendResponse.data.chartData)) {
-        // Transform the new API data format to the expected format
-        const transformedTrendData = trendResponse.data.chartData.map((item: any) => ({
-          date: item.date,
-          day: item.date,
-          calls: item.totalErrors || 0,
-          sessions: item.totalErrors || 0,
-          errors: item.totalErrors || 0,
-          errorCount: item.totalErrors || 0,
-          successRate: 100 - ((item.totalErrors / Math.max(item.totalErrors, 1)) * 100)
-        }))
-        setErrorTrendData(transformedTrendData)
-        console.log('✅ Error trend loaded:', transformedTrendData.length, 'items')
+        // Use the new API data format directly for the error analysis charts
+        setErrorTrendData(trendResponse.data.chartData)
+        console.log('✅ Error trend loaded:', trendResponse.data.chartData.length, 'items')
       } else {
         setErrorTrendData([])
         console.log('📈 Using empty error trend data')
@@ -248,10 +271,22 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     }
   }
 
-  // Fetch error details using NEW detailed error list API
+  // Fetch error details using NEW detailed error list API - with caching
+  const errorDetailsCache = useRef<{ data: any[], timestamp: number } | null>(null)
+  const CACHE_DURATION = 60000 // 1 minute cache
+  
   const fetchErrorDetails = async () => {
     try {
-      console.log('🔄 Fetching error details...')
+      // Check cache first
+      const now = Date.now()
+      if (errorDetailsCache.current && 
+          (now - errorDetailsCache.current.timestamp) < CACHE_DURATION) {
+        console.log('📋 Using cached error details')
+        setErrorDetails(errorDetailsCache.current.data)
+        return { success: true }
+      }
+      
+      console.log('🔄 Fetching error details from API...')
       const response = await apiClient.getDetailedErrorList({
         date_filter: 'today',
         page: 1,
@@ -261,8 +296,13 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
       console.log('📋 Error details response:', response)
       
       if (response.success && response.data && response.data.errors && Array.isArray(response.data.errors)) {
+        // Cache the results
+        errorDetailsCache.current = {
+          data: response.data.errors,
+          timestamp: now
+        }
         setErrorDetails(response.data.errors)
-        console.log('✅ Error details loaded:', response.data.errors.length, 'items')
+        console.log('✅ Error details loaded and cached:', response.data.errors.length, 'items')
       } else {
         setErrorDetails([])
         console.log('📋 Using empty error details')
@@ -288,22 +328,6 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
 
       let agentPromise = Promise.resolve({ success: false, data: null })
       let allAgentsPromise = Promise.resolve({ success: false, data: [] })
-
-      // Get agent profile for employees
-      if (userRole === 'agent' && currentAgentId) {
-        agentPromise = apiClient.getAgentProfile(currentAgentId, 'today').catch(err => {
-          console.log('⚠️ Agent profile failed:', err)
-          return { success: false, data: null }
-        })
-      }
-
-      // Get all agents for admin/team-lead
-      if (userRole !== 'agent') {
-        allAgentsPromise = apiClient.getAllAgents('today').catch(err => {
-          console.log('⚠️ All agents failed:', err)
-          return { success: false, data: [] }
-        })
-      }
 
       const [leaderboardResponse, agentResponse, allAgentsResponse] = await Promise.all([
         leaderboardPromise, agentPromise, allAgentsPromise
@@ -525,16 +549,16 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     }
   }
 
-  // NEW: On-demand error details loading for error analysis page
   const loadErrorDetails = async () => {
     try {
-      console.log('🔄 Loading error details on-demand...')
+      console.log('🔄 Loading error details on demand...')
       await fetchErrorDetails()
-      console.log('✅ Error details loaded')
+      console.log('✅ Error details loaded on demand')
     } catch (err) {
       console.error('❌ Error loading error details:', err)
     }
   }
+
 
   // Load data when component mounts or dependencies change
   useEffect(() => {
@@ -562,7 +586,7 @@ export function DashboardProvider({ children, userRole }: DashboardProviderProps
     refreshErrorData,
     refreshAgentData,
     refreshDashboardStats,
-    loadErrorDetails  // NEW: On-demand error details loading
+    loadErrorDetails,
   }
 
   return (

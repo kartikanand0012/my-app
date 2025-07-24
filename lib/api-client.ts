@@ -207,6 +207,31 @@ class ApiClient {
     return this.post(ENDPOINTS.ERROR_ANALYTICS.SYNC_ERROR_ANALYSIS);
   }
 
+  // ===== SCHEDULED REPORTS APIs =====
+  async createScheduledReport(data: any): Promise<ApiResponse<any>> {
+    return this.post('/scheduled-reports', data);
+  }
+
+  async updateScheduledReport(id: string, data: any): Promise<ApiResponse<any>> {
+    return this.put(`/scheduled-reports/${id}`, data);
+  }
+
+  async deleteScheduledReport(id: string): Promise<ApiResponse<any>> {
+    return this.delete(`/scheduled-reports/${id}`);
+  }
+
+  async toggleScheduledReport(id: string): Promise<ApiResponse<any>> {
+    return this.post(`/scheduled-reports/${id}/toggle`);
+  }
+
+  async triggerReport(id: string): Promise<ApiResponse<any>> {
+    return this.post(`/scheduled-reports/${id}/trigger`);
+  }
+
+  async getReportHistory(reportId: string): Promise<ApiResponse<any>> {
+    return this.get(`/scheduled-reports/${reportId}/history`);
+  }
+
   // ===== DASHBOARD OVERVIEW APIs =====
   async getDashboardStats(): Promise<ApiResponse<any>> {
     return this.get(ENDPOINTS.AUTH.DASHBOARD_STATS);

@@ -3,26 +3,21 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { API_CONFIG, ENDPOINTS } from '@/lib/config';
+import { Calendar, Clock, FileText, MessageSquare, Plus, Settings, Trash2, Users } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { 
-  Calendar, 
-  Clock, 
-  Users, 
-  MessageSquare, 
-  Settings, 
   Play, 
   Pause, 
-  Trash2, 
-  Plus,
   CheckCircle,
   AlertCircle,
   Brain,
@@ -99,7 +94,7 @@ export function ReportAutomationPanel() {
   const loadScheduledReports = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/ai-agent/schedule', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AI_AGENT.SCHEDULE}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
@@ -131,7 +126,7 @@ export function ReportAutomationPanel() {
         template_type: formData.report_type
       };
 
-      const response = await fetch('/api/ai-agent/schedule', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AI_AGENT.SCHEDULE}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +158,7 @@ export function ReportAutomationPanel() {
 
   const toggleReportStatus = async (reportId: number, isActive: boolean) => {
     try {
-      const response = await fetch(`/api/ai-agent/schedule/${reportId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AI_AGENT.SCHEDULE}/${reportId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -190,7 +185,7 @@ export function ReportAutomationPanel() {
     setError('');
 
     try {
-      const response = await fetch('/api/ai-agent/teams/test', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AI_AGENT.TEAMS_TEST}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
@@ -217,7 +212,7 @@ export function ReportAutomationPanel() {
 
     try {
       // Generate a test report first
-      const reportResponse = await fetch('/api/ai-agent/report/generate', {
+      const reportResponse = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AI_AGENT.REPORT_GENERATE}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -235,7 +230,7 @@ export function ReportAutomationPanel() {
       }
 
       // Send test report to Teams
-      const teamsResponse = await fetch('/api/ai-agent/teams/send', {
+      const teamsResponse = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AI_AGENT.TEAMS_SEND}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

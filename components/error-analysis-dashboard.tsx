@@ -47,6 +47,7 @@ import { format } from "date-fns"
 import { useAuth } from "@/lib/auth-context"
 import { useDashboard } from "@/lib/dashboard-context"
 import { apiClient } from "@/lib/api-client"
+import { API_CONFIG } from "@/lib/config"
 import { DonutChart } from "@/components/ui/donut-chart";
 
 interface ErrorAnalysisDashboardProps {
@@ -148,7 +149,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'user' | 'ai', content: string, timestamp: Date, isTyping?: boolean}>>([{
     id: '1',
     type: 'ai',
-    content: 'Hello! I\'m your AI assistant for error analysis. I can help you generate reports, analyze trends, and provide insights. What would you like to know about your error data?',
+    content: 'Hello! I\'m your Smart AI Agent for error analysis. I can help you with:\n\n🤖 **Natural Language Queries** - Ask questions in plain English\n📊 **Real-time Data Analysis** - Get insights from your database\n📈 **Excel Report Generation** - Download comprehensive reports\n📝 **Query History** - Track your previous questions\n\nTry asking me things like:\n• "Show me all active agents"\n• "What are the most common error types?"\n• "Show me today\'s error analysis"\n• "Generate a performance report"\n\nWhat would you like to know about your error data?',
     timestamp: new Date()
   }])
   const [isTyping, setIsTyping] = useState(false)
@@ -166,6 +167,8 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   const [loadingWeeklyReport, setLoadingWeeklyReport] = useState(false)
   const [schedulingDaily, setSchedulingDaily] = useState(false)
   const [schedulingWeekly, setSchedulingWeekly] = useState(false)
+  const [systemStatus, setSystemStatus] = useState<any>(null)
+  const [loadingSystemStatus, setLoadingSystemStatus] = useState(false)
 
   // Load error trends data only once on mount
   const hasLoadedTrends = useRef(false)
@@ -187,7 +190,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     loadErrorTrendsData()
   }, [])
 
-  // Cleanup effect to clear all timers on unmount
+  // Cleanup effect to clear debounced timers on unmount
   useEffect(() => {
     return () => {
       if (debouncedFetchRef.current) {
@@ -279,13 +282,13 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     }
   }
 
-  // Debounced fetch function to prevent multiple API calls
-  const debouncedFetchRef = useRef<NodeJS.Timeout | null>(null)
+  // Parameter tracking for API calls
   const lastFetchParamsRef = useRef<string>('')
   
 
-  // Optimized debounced function with better parameter tracking
-  const debouncedFetchFilteredErrorDetails = useCallback(() => {
+  // Debounced API call for search inputs to prevent excessive API calls
+  const debouncedFetchRef = useRef<NodeJS.Timeout | null>(null)
+  const fetchFilteredErrorDetailsDebounced = useCallback(() => {
     const currentParams = JSON.stringify({
       searchTerm: searchTerm?.trim() || '', 
       statusFilter, 
@@ -299,7 +302,6 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     
     // Skip if parameters haven't changed
     if (lastFetchParamsRef.current === currentParams) {
-      console.log('⏭️ Skipping API call - parameters unchanged')
       return
     }
     
@@ -308,15 +310,12 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       clearTimeout(debouncedFetchRef.current)
     }
     
-    // Set new timeout with improved debouncing
+    // Set new timeout for search debouncing
     debouncedFetchRef.current = setTimeout(() => {
-      console.log('🔍 Making optimized API call after debounce')
-      console.log('📋 Parameters changed from:', lastFetchParamsRef.current)
-      console.log('📋 Parameters changed to:', currentParams)
       lastFetchParamsRef.current = currentParams
       fetchFilteredErrorDetails()
-    }, 300) // Reduced debounce time for better UX
-  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, currentPage, selectedAgent]) // Removed fetchFilteredErrorDetails to prevent infinite loop
+    }, 300) // 300ms debounce for search inputs
+  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, currentPage, selectedAgent])
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -324,7 +323,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     setPastCurrentPage(1)
   }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, selectedAgent])
 
-  // OPTIMIZED filter logic - prevents multiple API calls and unnecessary re-renders
+  // IMMEDIATE filter logic - no debouncing for instant response
   useEffect(() => {
     const hasActiveFilters = (searchTerm?.trim()) || 
                            statusFilter !== 'all' || 
@@ -335,57 +334,11 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                            selectedAgent
     
     if (hasActiveFilters) {
-      console.log('🔍 Active filters detected, calling optimized API:', {
-        searchTerm: searchTerm?.trim(),
-        statusFilter,
-        typeFilter, 
-        uuidFilter: uuidFilter?.trim(),
-        dateFrom: dateFrom?.toISOString(),
-        dateTo: dateTo?.toISOString(),
-        selectedAgent
-      })
-      
-      // Call the debounced function directly to avoid dependency issues
-      const currentParams = JSON.stringify({
-        searchTerm: searchTerm?.trim() || '', 
-        statusFilter, 
-        typeFilter, 
-        uuidFilter: uuidFilter?.trim() || '', 
-        dateFrom: dateFrom?.toISOString() || '', 
-        dateTo: dateTo?.toISOString() || '', 
-        currentPage, 
-        selectedAgent: selectedAgent || ''
-      })
-      
-      // Skip if parameters haven't changed
-      if (lastFetchParamsRef.current === currentParams) {
-        console.log('⏭️ Skipping API call - parameters unchanged')
-        return
-      }
-      
-      // Clear existing timeout
-      if (debouncedFetchRef.current) {
-        clearTimeout(debouncedFetchRef.current)
-      }
-      
-      // Set new timeout with improved debouncing
-      debouncedFetchRef.current = setTimeout(() => {
-        console.log('🔍 Making optimized API call after debounce')
-        lastFetchParamsRef.current = currentParams
-        fetchFilteredErrorDetails()
-      }, 300)
+      // Call the debounced function for search inputs
+      fetchFilteredErrorDetailsDebounced()
     } else {
-      console.log('📋 No active filters, using context data')
-      // Clear any pending API calls
-      if (debouncedFetchRef.current) {
-        clearTimeout(debouncedFetchRef.current)
-        debouncedFetchRef.current = null
-      }
-      
       // Use context data when no filters are active - this prevents unnecessary API calls
       if (errorDetails && Array.isArray(errorDetails)) {
-        console.log('📊 Using context data:', errorDetails.length, 'records')
-        
         // Only transform if we have data
         if (errorDetails.length > 0) {
           const transformedErrors = errorDetails.map((error: any) => ({
@@ -413,7 +366,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         setFilteredErrors([])
       }
     }
-  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, currentPage, selectedAgent]) // Removed debouncedFetchFilteredErrorDetails to prevent infinite loop
+  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, currentPage, selectedAgent, fetchFilteredErrorDetailsDebounced])
 
   // Optimized context data transformation - only updates when errorDetails actually change
   useEffect(() => {
@@ -427,8 +380,6 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     
     // Only update from context data when no filters are active and errorDetails has changed
     if (!hasActiveFilters && errorDetails) {
-      console.log('📊 Context errorDetails changed, updating display data')
-      
       if (Array.isArray(errorDetails) && errorDetails.length > 0) {
         const transformedErrors = errorDetails.map((error: any) => ({
           id: error.uuid || error.id,
@@ -452,7 +403,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         setFilteredErrors([])
       }
     }
-  }, [errorDetails]) // Only depend on errorDetails, not on filter states
+  }, [errorDetails, searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, selectedAgent])
 
   // Load saved queries, scheduled reports, and team members only once
   const hasLoadedAPIData = useRef(false)
@@ -463,8 +414,10 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       if (userRole === 'admin' || userRole === 'team-lead') {
         hasLoadedAPIData.current = true
         await loadSavedQueries()
+        await loadQueryHistory() // Load query history from Smart AI Agent API
         await loadScheduledReports()
         await loadTeamMembers()
+        await loadSystemStatus() // Load system status from Smart AI Agent API
       }
     }
     loadAPIData()
@@ -482,6 +435,31 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       console.error('Error loading saved queries:', error)
     } finally {
       setLoadingSavedQueries(false)
+    }
+  }
+
+  // Load query history from Smart AI Agent API
+  const loadQueryHistory = async () => {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/smart-ai/history?limit=20`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      })
+      const data = await response.json()
+      if (data.success && data.data?.history) {
+        // Transform the history data to match our format
+        const transformedHistory = data.data.history.map((item: any) => ({
+          id: item.id,
+          name: `Query ${item.id}`,
+          query: item.query_text,
+          filters: {},
+          createdAt: new Date(item.created_at).toLocaleDateString()
+        }))
+        setSavedQueries(transformedHistory)
+      }
+    } catch (error) {
+      console.error('Error loading query history:', error)
     }
   }
 
@@ -511,6 +489,26 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       }
     } catch (error) {
       console.error('Error loading team members:', error)
+    }
+  }
+
+  // Get system status from Smart AI Agent API
+  const loadSystemStatus = async () => {
+    try {
+      setLoadingSystemStatus(true)
+      const response = await fetch(`${API_CONFIG.BASE_URL}/smart-ai/status`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      })
+      const data = await response.json()
+      if (data.success && data.data) {
+        setSystemStatus(data.data)
+      }
+    } catch (error) {
+      console.error('Error loading system status:', error)
+    } finally {
+      setLoadingSystemStatus(false)
     }
   }
 
@@ -566,38 +564,36 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     }, 100)
 
     try {
-      const currentFilters = {
-        dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
-        dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
-        statusFilter,
-        typeFilter,
-        searchTerm,
-        tagAllUsers,
-        selectedRecipients,
-        customMessage,
-        selectedTemplate
-      }
+      // Use Smart AI Agent API for natural language query processing
+      const response = await fetch(`${API_CONFIG.BASE_URL}/smart-ai/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          query_text: currentQuery
+        })
+      })
 
-      // Use new conversational AI chat API
-      const response = await apiClient.sendChatMessage(currentQuery, chatMessages)
-
+      const data = await response.json()
       setIsTyping(false)
 
-      if (response.success && response.data) {
-        // Add AI response to chat
+      if (data.success && data.data) {
+        // Add AI response to chat with improved formatting
         const aiResponse = {
           id: (Date.now() + 1).toString(),
           type: 'ai' as const,
-          content: response.data.message || response.data.analysis || 'I apologize, but I received an empty response.',
+          content: formatAIResponse(data.data),
           timestamp: new Date()
         }
         
         setChatMessages(prev => [...prev, aiResponse])
-        setGeneratedReport(response.data)
+        setGeneratedReport(data.data)
         
         // Send notifications if team members are tagged
         if (tagAllUsers || selectedRecipients.length > 0) {
-          await handleSendTeamNotification(response.data)
+          await handleSendTeamNotification(data.data)
           
           // Add notification message
           const notificationMessage = {
@@ -613,7 +609,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         const errorMessage = {
           id: (Date.now() + 1).toString(),
           type: 'ai' as const,
-          content: `❌ I apologize, but I encountered an error while generating the report: ${response.message || 'Unknown error'}. Please try rephrasing your request or contact support if the issue persists.`,
+          content: `❌ I apologize, but I encountered an error while processing your query: ${data.message || 'Unknown error'}. Please try rephrasing your request or contact support if the issue persists.`,
           timestamp: new Date()
         }
         setChatMessages(prev => [...prev, errorMessage])
@@ -643,31 +639,44 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   
   // Format AI response for better readability
   const formatAIResponse = (data: any) => {
-    if (!data) return "I've generated your report, but it seems to be empty. Please try a more specific query.";
+    if (!data) return "I've processed your query, but it seems to be empty. Please try a more specific question.";
 
-    let response = "📊 **Analysis Complete!**\n\n";
+    let response = "🤖 **AI Analysis Complete!**\n\n";
 
-    if (data.summary) {
-      response += `**Summary:**\n${data.summary}\n\n`;
+    // Use the response from the Smart AI Agent API
+    if (data.response) {
+      response += `${data.response}\n\n`;
     }
 
-    if (data.recommendations && Array.isArray(data.recommendations)) {
-      response += "**Key Recommendations:**\n";
-      data.recommendations.forEach((rec: string, index: number) => {
-        response += `${index + 1}. ${rec}\n`;
-      });
+    // Add data insights if available
+    if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+      response += `📊 **Data Summary:**\n`;
+      response += `• Total Records: ${data.rowCount || data.data.length}\n`;
+      
+      // Show sample data if available
+      if (data.data.length <= 5) {
+        response += `• Sample Data: ${data.data.length} record(s) found\n`;
+      } else {
+        response += `• Sample Data: Showing first 5 of ${data.data.length} records\n`;
+      }
       response += "\n";
     }
 
-    if (data.data) {
-      response += "**Key Metrics:**\n";
-      if (data.data.totalErrors) response += `• Total Errors: ${data.data.totalErrors}\n`;
-      if (data.data.topErrorTypes) response += `• Top Error Types: ${data.data.topErrorTypes.join(', ')}\n`;
-      if (data.data.affectedAgents) response += `• Affected Agents: ${data.data.affectedAgents}\n`;
-      response += "\n";
+    // Add SQL query if available (for transparency)
+    if (data.sqlGenerated) {
+      response += `🔍 **Generated SQL:**\n\`\`\`sql\n${data.sqlGenerated}\n\`\`\`\n\n`;
     }
 
-    response += "Is there anything specific you'd like me to elaborate on or any other analysis you need?";
+    // Add execution time if available
+    if (data.execution_time_ms) {
+      response += `⏱️ **Query executed in:** ${data.execution_time_ms}ms\n\n`;
+    }
+
+    response += "💡 **What would you like to do next?**\n";
+    response += "• Ask follow-up questions\n";
+    response += "• Generate an Excel report\n";
+    response += "• Save this query for later\n";
+    response += "• Schedule automated reports";
 
     return response;
   }
@@ -761,7 +770,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     }
   }
 
-  // Generate and download Excel report
+  // Generate and download Excel report using Smart AI Agent API
   const handleGenerateExcelReport = async () => {
     try {
       setIsGeneratingReport(true)
@@ -775,27 +784,44 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       }
       setChatMessages(prev => [...prev, generatingMessage])
       
-      const response = await apiClient.generateAIReport('comprehensive', '30_days', true)
+      // Use Smart AI Agent API for Excel generation
+      const response = await fetch(`${API_CONFIG.BASE_URL}/smart-ai/excel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          query_text: "Generate a comprehensive error analysis report with all error types, agent performance, and trends",
+          report_name: `Error_Analysis_Report_${new Date().toISOString().split('T')[0]}`
+        })
+      })
       
-      if (response.success && response.data?.excel?.filename) {
+      const data = await response.json()
+      
+      if (data.success && data.data?.filename) {
         // Add success message to chat
         const successMessage = {
           id: (Date.now() + 1).toString(),
           type: 'ai' as const,
-          content: `✅ Excel report "${response.data.excel.filename}" generated successfully! The report includes:\n\n📈 Executive Summary with key insights\n👥 Agent Performance Analysis\n❌ Error Analysis with detailed breakdown\n🤖 AI-generated insights and recommendations\n\nClick the download button below to save the report.`,
+          content: `✅ Excel report "${data.data.filename}" generated successfully! The report includes:\n\n📈 Comprehensive error analysis\n👥 Agent performance insights\n❌ Error type breakdown\n📊 Trend analysis and recommendations\n\nClick the download button below to save the report.`,
           timestamp: new Date()
         }
         setChatMessages(prev => [...prev, successMessage])
         
-        // Trigger download
-        const downloadResponse = await apiClient.downloadAIReport(response.data.excel.filename)
+        // Trigger download using Smart AI Agent API
+        const downloadResponse = await fetch(`${API_CONFIG.BASE_URL}/smart-ai/download/${data.data.filename}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        })
         
         if (downloadResponse.ok) {
           const blob = await downloadResponse.blob()
           const url = window.URL.createObjectURL(blob)
           const link = document.createElement('a')
           link.href = url
-          link.download = response.data.excel.filename
+          link.download = data.data.filename
           document.body.appendChild(link)
           link.click()
           document.body.removeChild(link)
@@ -809,9 +835,11 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
             timestamp: new Date()
           }
           setChatMessages(prev => [...prev, downloadMessage])
+        } else {
+          throw new Error('Failed to download the report')
         }
       } else {
-        throw new Error(response.message || 'Failed to generate Excel report')
+        throw new Error(data.message || 'Failed to generate Excel report')
       }
     } catch (error: any) {
       console.error('Error generating Excel report:', error)
@@ -844,23 +872,46 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       }
       setChatMessages(prev => [...prev, reportMessage])
       
-      // Generate report using template
-      const response = await apiClient.sendChatMessage(
-        `Generate a ${template.name} report: ${template.description}`,
-        chatMessages
-      )
+      // Generate report using Smart AI Agent API
+      const response = await fetch(`${API_CONFIG.BASE_URL}/smart-ai/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          query_text: `Generate a ${template.name} report: ${template.description}`
+        })
+      })
       
-      if (response.success) {
+      const data = await response.json()
+      
+      if (data.success && data.data) {
         const aiResponse = {
           id: (Date.now() + 1).toString(),
           type: 'ai' as const,
-          content: response.data.message,
+          content: formatAIResponse(data.data),
           timestamp: new Date()
         }
         setChatMessages(prev => [...prev, aiResponse])
+      } else {
+        const errorResponse = {
+          id: (Date.now() + 1).toString(),
+          type: 'ai' as const,
+          content: `❌ Failed to load ${template.name} report: ${data.message || 'Unknown error'}`,
+          timestamp: new Date()
+        }
+        setChatMessages(prev => [...prev, errorResponse])
       }
     } catch (error) {
       console.error('Error loading report:', error)
+      const errorResponse = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai' as const,
+        content: '❌ Failed to load report due to network error. Please try again.',
+        timestamp: new Date()
+      }
+      setChatMessages(prev => [...prev, errorResponse])
     } finally {
       setIsGeneratingReport(false)
     }
@@ -985,15 +1036,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   const todayTotalPages = Math.ceil(allTodayErrors.length / itemsPerPage)
   const pastTotalPages = Math.ceil(allPastErrors.length / itemsPerPage)
 
-  console.log('📊 Error analysis data:', {
-    totalFiltered: filteredErrors.length,
-    todayCount: allTodayErrors.length,
-    pastCount: allPastErrors.length,
-    todayPaginated: todayErrors.length,
-    pastPaginated: pastErrors.length,
-    contextErrorDetails: errorDetails.length,
-    sampleError: filteredErrors[0]
-  })
+  // Performance optimization: Removed console.log to improve typing performance
 
   // Local error analytics data (fallback when context data is not available)
   const localErrorStats = {
@@ -1493,21 +1536,38 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
             {/* AI Chat Interface */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-lg font-semibold">Chat with AI Assistant</Label>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    setChatMessages([{
-                      id: Date.now().toString(),
-                      type: 'ai',
-                      content: 'Hello! I\'m your AI assistant for error analysis. I can help you generate reports, analyze trends, and provide insights. What would you like to know about your error data?',
-                      timestamp: new Date()
-                    }])
-                  }}
-                >
-                  Clear Chat
-                </Button>
+                <div className="flex items-center space-x-4">
+                  <Label className="text-lg font-semibold">Chat with AI Assistant</Label>
+                  {systemStatus && (
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        systemStatus.status === 'operational' ? 'bg-green-500' : 'bg-red-500'
+                      }`} />
+                      <span className="text-sm text-gray-600">
+                        {systemStatus.status === 'operational' ? 'System Online' : 'System Offline'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  {loadingSystemStatus && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setChatMessages([{
+                        id: Date.now().toString(),
+                        type: 'ai',
+                        content: `Hello! I'm your Smart AI Agent for error analysis. I can help you with:\n\n🤖 **Natural Language Queries** - Ask questions in plain English\n📊 **Real-time Data Analysis** - Get insights from your database\n📈 **Excel Report Generation** - Download comprehensive reports\n📝 **Query History** - Track your previous questions\n\n${systemStatus ? `\n🟢 **System Status:** ${systemStatus.status}\n🔧 **Capabilities:** ${systemStatus.capabilities?.join(', ')}` : ''}\n\nTry asking me things like:\n• "Show me all active agents"\n• "What are the most common error types?"\n• "Show me today's error analysis"\n• "Generate a performance report"\n\nWhat would you like to know about your error data?`,
+                        timestamp: new Date()
+                      }])
+                    }}
+                  >
+                    Clear Chat
+                  </Button>
+                </div>
               </div>
               
               {/* Chat Messages Area */}
@@ -1536,7 +1596,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                             <span className="text-gray-500 ml-2">AI is thinking...</span>
                           </div>
                         ) : (
-                          <div className="whitespace-pre-wrap">{message.content}</div>
+                          <div className="whitespace-pre-wrap break-words">{message.content}</div>
                         )}
                       </div>
                       <div className={`text-xs mt-2 ${
@@ -1578,7 +1638,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                     value={aiQuery}
                     onChange={(e) => setAiQuery(e.target.value)}
                     rows={2}
-                    className="resize-none"
+                    className="resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-150"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
@@ -1587,6 +1647,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                         }
                       }
                     }}
+                    disabled={isGeneratingReport}
                   />
                 </div>
                 <div className="flex flex-col space-y-1">
@@ -1667,23 +1728,30 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setAiQuery("Show me the top error types and their trends")}
+                    onClick={() => setAiQuery("Show me all error types and their distribution")}
                   >
-                    Error Trends
+                    Error Types
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setAiQuery("Analyze agent performance and provide recommendations")}
+                    onClick={() => setAiQuery("Show me all active agents and their performance")}
                   >
-                    Agent Analysis
+                    Active Agents
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setAiQuery("Generate a detailed report for management")}
+                    onClick={() => setAiQuery("Show me today's error analysis")}
                   >
-                    Management Report
+                    Today's Errors
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setAiQuery("Show me agent performance metrics")}
+                  >
+                    Performance
                   </Button>
                   <Button 
                     variant="outline" 
@@ -1821,51 +1889,6 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
             </div>
 
             {/* Recent Report Runs */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Recent Report Runs</h4>
-              {reportHistory.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <FileSpreadsheet className="h-8 w-8 mx-auto mb-2" />
-                  <p>No recent report runs</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {reportHistory.map((run) => (
-                    <div key={run.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          run.status === 'success' ? 'bg-green-500' : 
-                          run.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500'
-                        }`} />
-                        <div>
-                          <p className="font-medium">{run.reportName}</p>
-                          <p className="text-sm text-gray-600">
-                            {run.executedAt} | Duration: {run.duration}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge
-                          variant="outline"
-                          className={
-                            run.status === 'success'
-                              ? "text-green-600 border-green-200"
-                              : run.status === 'failed'
-                              ? "text-red-600 border-red-200"
-                              : "text-yellow-600 border-yellow-200"
-                          }
-                        >
-                          {run.status}
-                        </Badge>
-                        <Button size="sm" variant="outline">
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Team Communication Settings */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

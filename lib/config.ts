@@ -1,6 +1,5 @@
 export const API_CONFIG = {
-  //BASE_URL: 'http://localhost:3001/api',
-  BASE_URL: 'https://my-app-be-u7uh.onrender.com/api',
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
   USE_MOCK_API: process.env.NEXT_PUBLIC_USE_MOCK_API === 'true' || false,
 };
 
@@ -18,10 +17,20 @@ export const ENDPOINTS = {
     PROMPTS: '/ai-agent/prompts',
     PROMPTS_USE: '/ai-agent/prompts',
     REPORT_GENERATE: '/ai-agent/report/generate',
+    REPORT_TEMPLATES: '/ai-agent/report/templates',
     SCHEDULE: '/ai-agent/schedule',
+    SCHEDULER_TOGGLE: '/ai-agent/scheduler/toggle',
+    SCHEDULER_STATUS: '/ai-agent/scheduler/status',
     TEAMS_SEND: '/ai-agent/teams/send',
     TEAMS_TEST: '/ai-agent/teams/test',
     SESSION: '/ai-agent/session',
+    EXPORT_CSV: '/ai-agent/export/csv',
+  },
+  AI_CHAT: {
+    MESSAGE: '/ai-chat/message',
+    HISTORY: '/ai-chat/history',
+    GENERATE_REPORT: '/ai-chat/generate-report',
+    DOWNLOAD: '/ai-chat/download',
   },
   ANALYTICS: {
     // Agent Performance APIs
@@ -46,8 +55,17 @@ export const ENDPOINTS = {
     ERROR_TREND: '/error-analytics/error-trend',
     ERROR_TYPES_DISTRIBUTION: '/error-analytics/error-types-distribution',
     ERROR_DETAILS: '/error-analytics/error-details',
+    DETAILED_ERROR_LIST: '/error-analytics/detailed-error-list',
     ACKNOWLEDGE_ERROR: '/error-analytics/error',
     APPROVE_ERROR: '/error-analytics/error',
+    
+    // Chart APIs
+    AGENT_REJECTION_PIE_CHART: '/error-analytics/agent-rejection-pie-chart',
+    IA_ERROR_TYPES_PIE_CHART: '/error-analytics/ia-error-types-pie-chart',
+    ERROR_TRENDS_CHART: '/error-analytics/error-trends-chart',
+    
+    // Sync API
+    SYNC_ERROR_ANALYSIS: '/error-analytics/sync-error-analysis',
     
     // AI Reporting APIs
     SAVED_QUERIES: '/error-analytics/saved-queries',

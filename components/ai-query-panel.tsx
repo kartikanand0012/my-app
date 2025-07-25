@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Send, Clock, Database, Brain, History, Code } from 'lucide-react';
 import { executeAIQuery } from '@/lib/api';
+import { API_CONFIG, ENDPOINTS } from '@/lib/config';
 
 interface QueryResult {
   query: string;
@@ -76,7 +77,7 @@ export function AIQueryPanel() {
 
   const loadQueryHistory = async () => {
     try {
-      const response = await fetch('/api/ai-agent/query/history', {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${ENDPOINTS.AI_AGENT.QUERY_HISTORY}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }

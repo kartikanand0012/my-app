@@ -313,6 +313,27 @@ class ApiClient {
       throw error;
     }
   }
+
+  // ===== QUALITY CHECK APIs =====
+  async uploadQualityCheck(file: File, additionalData?: any): Promise<ApiResponse<any>> {
+    return this.uploadFile(ENDPOINTS.QUALITY_CHECK.UPLOAD, file, additionalData);
+  }
+
+  async analyzeQualityCheck(data: any): Promise<ApiResponse<any>> {
+    return this.post(ENDPOINTS.QUALITY_CHECK.ANALYZE, data);
+  }
+
+  async getQualityCheckVideos(): Promise<ApiResponse<any>> {
+    return this.get(ENDPOINTS.QUALITY_CHECK.VIDEOS);
+  }
+
+  async getFlaggedQualityChecks(): Promise<ApiResponse<any>> {
+    return this.get(ENDPOINTS.QUALITY_CHECK.FLAGGED);
+  }
+
+  async getQualityCheckStats(): Promise<ApiResponse<any>> {
+    return this.get(ENDPOINTS.QUALITY_CHECK.STATS);
+  }
 }
 
 export const apiClient = new ApiClient();

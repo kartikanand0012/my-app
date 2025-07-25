@@ -31,6 +31,8 @@ import {
   BookOpenCheck,
 } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
+import { AI_BACKEND_URL } from "@/lib/config";
+import ReactMarkdown from 'react-markdown';
 
 interface VideoAnalysisResult {
   uuid: string
@@ -52,6 +54,7 @@ interface VideoAnalysisResult {
   }
   recommendations: string[]
   analysis_timestamp: string
+  result?: any // Added for the new display
 }
 
 interface UploadedVideo {
@@ -59,7 +62,7 @@ interface UploadedVideo {
   filename: string
   agent_id: string
   error_type: string
-  status: 'uploading' | 'analyzing' | 'completed' | 'failed'
+  status: 'uploading' | 'analyzing' | 'completed' | 'failed' | 'uploaded'
   progress: number
   analysis_result?: VideoAnalysisResult
   video_url?: string
@@ -83,7 +86,7 @@ export function VideoUploadAnalyzer() {
     }
 
     if (!agentId.trim()) {
-      setError('Please enter an Agent ID')
+      setError('Please enter a Session ID')
       return
     }
 
@@ -100,7 +103,7 @@ export function VideoUploadAnalyzer() {
       id: videoId,
       filename: file.name,
       agent_id: agentId,
-      error_type: errorType,
+      error_type: '', // not used anymore
       status: 'uploading',
       progress: 0,
       created_at: new Date().toISOString()
@@ -109,25 +112,29 @@ export function VideoUploadAnalyzer() {
     setUploadedVideos(prev => [newVideo, ...prev])
 
     try {
-      // Upload video file
-      const response = await apiClient.uploadFile('/quality-check/upload-video', file, {
-        agent_id: agentId,
-        error_type: errorType,
-        video_id: videoId
-      })
+      // Prepare FormData
+      const formData = new FormData();
+      formData.append('session_id', agentId);
+      formData.append('file', file);
 
-      if (response.success) {
-        // Update status to analyzing
-        setUploadedVideos(prev => prev.map(video => 
-          video.id === videoId 
-            ? { ...video, status: 'analyzing', progress: 50, video_url: response.data.video_url }
+      // Upload to AI_BACKEND_URL/analyse
+      const response = await fetch(`${AI_BACKEND_URL}/analyze`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Set status to 'uploaded' before polling
+        setUploadedVideos(prev => prev.map(video =>
+          video.id === videoId
+            ? { ...video, status: 'uploaded', progress: 100 }
             : video
-        ))
-
-        // Start AI analysis
-        await analyzeVideo(videoId, response.data.video_id)
+        ));
+        // Start polling for analysis result
+        pollAnalysisResult(agentId, videoId);
       } else {
-        throw new Error(response.message || 'Upload failed')
+        throw new Error('Upload failed')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
@@ -140,6 +147,33 @@ export function VideoUploadAnalyzer() {
       setIsUploading(false)
     }
   }
+
+  // Polling function for analysis result
+  const pollAnalysisResult = (sessionId: string, videoId: string) => {
+    const poll = async () => {
+      try {
+        const res = await fetch(`${AI_BACKEND_URL}/result/${sessionId}`);
+        if (!res.ok) throw new Error("Failed to fetch analysis result");
+        const data = await res.json();
+        if (data.status === "processing") {
+          setTimeout(poll, 3000);
+        } else {
+          setUploadedVideos(prev => prev.map(video =>
+            video.id === videoId
+              ? { ...video, status: 'completed', progress: 100, analysis_result: data }
+              : video
+          ));
+        }
+      } catch (err) {
+        setUploadedVideos(prev => prev.map(video =>
+          video.id === videoId
+            ? { ...video, status: 'failed' }
+            : video
+        ));
+      }
+    };
+    poll();
+  };
 
   const analyzeVideo = async (videoId: string, uploadedVideoId: string) => {
     try {
@@ -251,30 +285,14 @@ export function VideoUploadAnalyzer() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 mb-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="agent-id">Agent ID</Label>
-                <Input
-                  id="agent-id"
-                  placeholder="e.g., AG001"
-                  value={agentId}
-                  onChange={(e) => setAgentId(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="error-type">Expected Error Type</Label>
-                <select
-                  id="error-type"
-                  value={errorType}
-                  onChange={(e) => setErrorType(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="language">Language Issues</option>
-                  <option value="body_language">Body Language</option>
-                  <option value="sop">SOP Compliance</option>
-                  <option value="technical">Technical Quality</option>
-                </select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="session-id">Session ID</Label>
+              <Input
+                id="session-id"
+                placeholder="Enter Session ID"
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value)}
+              />
             </div>
           </div>
 
@@ -319,7 +337,14 @@ export function VideoUploadAnalyzer() {
             ref={fileInputRef}
             type="file"
             accept="video/*"
-            onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleFileUpload(file);
+                // Optionally clear the input so the same file can be selected again
+                e.target.value = '';
+              }
+            }}
             className="hidden"
           />
 
@@ -383,6 +408,13 @@ export function VideoUploadAnalyzer() {
                     <Progress value={video.progress} className="h-2" />
                   </div>
                 )}
+                {/* Generating summary box while polling */}
+                {video.status === 'uploaded' && (
+                  <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating summary...
+                  </div>
+                )}
 
                 {/* Quick Results Summary */}
                 {video.analysis_result && (
@@ -390,7 +422,7 @@ export function VideoUploadAnalyzer() {
                     <div className="text-center">
                       <p className="font-medium">AI Confidence</p>
                       <Badge variant="outline">
-                        {Math.round(video.analysis_result.confidence * 100)}%
+                        {video.analysis_result.confidence !== undefined ? Math.round(video.analysis_result.confidence * 100) + '%' : 'N/A'}
                       </Badge>
                     </div>
                     <div className="text-center">
@@ -405,20 +437,48 @@ export function VideoUploadAnalyzer() {
                     <div className="text-center">
                       <p className="font-medium">Issues Found</p>
                       <Badge variant="outline">
-                        {video.analysis_result.issues.length}
+                        {video.analysis_result.issues ? video.analysis_result.issues.length : 'N/A'}
                       </Badge>
                     </div>
                     <div className="text-center">
                       <p className="font-medium">Overall Score</p>
                       <Badge variant="outline">
-                        {Math.round(
+                        {video.analysis_result.technical_scores ? Math.round(
                           (video.analysis_result.technical_scores.language_score + 
                            video.analysis_result.technical_scores.body_language_score + 
                            video.analysis_result.technical_scores.sop_compliance_score + 
                            video.analysis_result.technical_scores.technical_quality_score) / 4
-                        )}%
+                        ) + '%' : 'N/A'}
                       </Badge>
                     </div>
+                  </div>
+                )}
+                {/* Display result field if present */}
+                {video.analysis_result && video.analysis_result.result && (
+                  <div className="mt-3 p-3 border rounded bg-gray-50 text-sm space-y-4">
+                    <strong>Result:</strong>
+                    {video.analysis_result.result.summary && (
+                      <div>
+                        <h5 className="font-bold mb-1">Summary</h5>
+                        <ReactMarkdown>{video.analysis_result.result.summary}</ReactMarkdown>
+                      </div>
+                    )}
+                    {video.analysis_result.result.mistakes && (
+                      <div>
+                        <h5 className="font-bold mb-1">Mistakes</h5>
+                        <ReactMarkdown>{video.analysis_result.result.mistakes}</ReactMarkdown>
+                      </div>
+                    )}
+                    {video.analysis_result.result.full_report && (
+                      <div>
+                        <h5 className="font-bold mb-1">Full Report</h5>
+                        <ReactMarkdown>{video.analysis_result.result.full_report}</ReactMarkdown>
+                      </div>
+                    )}
+                    {/* Fallback for string or other formats */}
+                    {typeof video.analysis_result.result === 'string' && (
+                      <ReactMarkdown>{video.analysis_result.result}</ReactMarkdown>
+                    )}
                   </div>
                 )}
               </div>
@@ -457,32 +517,32 @@ export function VideoUploadAnalyzer() {
                   <div className="text-center p-3 border rounded">
                     <p className="text-sm text-gray-600">Language</p>
                     <p className="text-2xl font-bold text-blue-600">
-                      {selectedVideo.analysis_result.technical_scores.language_score}%
+                      {selectedVideo.analysis_result.technical_scores?.language_score ?? 'N/A'}%
                     </p>
                   </div>
                   <div className="text-center p-3 border rounded">
                     <p className="text-sm text-gray-600">Body Language</p>
                     <p className="text-2xl font-bold text-green-600">
-                      {selectedVideo.analysis_result.technical_scores.body_language_score}%
+                      {selectedVideo.analysis_result.technical_scores?.body_language_score ?? 'N/A'}%
                     </p>
                   </div>
                   <div className="text-center p-3 border rounded">
                     <p className="text-sm text-gray-600">SOP Compliance</p>
                     <p className="text-2xl font-bold text-purple-600">
-                      {selectedVideo.analysis_result.technical_scores.sop_compliance_score}%
+                      {selectedVideo.analysis_result.technical_scores?.sop_compliance_score ?? 'N/A'}%
                     </p>
                   </div>
                   <div className="text-center p-3 border rounded">
                     <p className="text-sm text-gray-600">Technical Quality</p>
                     <p className="text-2xl font-bold text-orange-600">
-                      {selectedVideo.analysis_result.technical_scores.technical_quality_score}%
+                      {selectedVideo.analysis_result.technical_scores?.technical_quality_score ?? 'N/A'}%
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* Issues Found */}
-              {selectedVideo.analysis_result.issues.length > 0 && (
+              {selectedVideo.analysis_result.issues && selectedVideo.analysis_result.issues.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-3">Issues Detected</h4>
                   <div className="space-y-3">
@@ -507,8 +567,37 @@ export function VideoUploadAnalyzer() {
                 </div>
               )}
 
+              {/* Display result field if present */}
+              {selectedVideo.analysis_result.result && (
+                <div className="p-3 border rounded bg-gray-50 text-sm space-y-4">
+                  <strong>Result:</strong>
+                  {selectedVideo.analysis_result.result.summary && (
+                    <div>
+                      <h5 className="font-bold mb-1">Summary</h5>
+                      <ReactMarkdown>{selectedVideo.analysis_result.result.summary}</ReactMarkdown>
+                    </div>
+                  )}
+                  {selectedVideo.analysis_result.result.mistakes && (
+                    <div>
+                      <h5 className="font-bold mb-1">Mistakes</h5>
+                      <ReactMarkdown>{selectedVideo.analysis_result.result.mistakes}</ReactMarkdown>
+                    </div>
+                  )}
+                  {selectedVideo.analysis_result.result.full_report && (
+                    <div>
+                      <h5 className="font-bold mb-1">Full Report</h5>
+                      <ReactMarkdown>{selectedVideo.analysis_result.result.full_report}</ReactMarkdown>
+                    </div>
+                  )}
+                  {/* Fallback for string or other formats */}
+                  {typeof selectedVideo.analysis_result.result === 'string' && (
+                    <ReactMarkdown>{selectedVideo.analysis_result.result}</ReactMarkdown>
+                  )}
+                </div>
+              )}
+
               {/* Recommendations */}
-              {selectedVideo.analysis_result.recommendations.length > 0 && (
+              {selectedVideo.analysis_result.recommendations && selectedVideo.analysis_result.recommendations.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-3">AI Recommendations</h4>
                   <div className="space-y-2">

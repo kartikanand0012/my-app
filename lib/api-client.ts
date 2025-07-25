@@ -102,8 +102,13 @@ class ApiClient {
     return this.get(url);
   }
 
-  async getAllAgents(dateRange?: string): Promise<ApiResponse<any>> {
-    const url = `${ENDPOINTS.ANALYTICS.ALL_AGENTS}${dateRange ? `?date_range=${dateRange}` : ''}`;
+  async getAllAgents(dateRange?: string, search?: string, limit?: number, offset?: number): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (dateRange) params.set('date_range', dateRange);
+    if (search) params.set('search', search);
+    if (limit) params.set('limit', limit.toString());
+    if (offset) params.set('offset', offset.toString());
+    const url = `${ENDPOINTS.ANALYTICS.ALL_AGENTS}${params.toString() ? `?${params.toString()}` : ''}`;
     return this.get(url);
   }
 
@@ -162,10 +167,6 @@ class ApiClient {
     return this.get(ENDPOINTS.ERROR_ANALYTICS.SCHEDULED_REPORTS);
   }
 
-  async generateAIReport(data: { query: string; filters: any }): Promise<ApiResponse<any>> {
-    return this.post(ENDPOINTS.ERROR_ANALYTICS.GENERATE_AI_REPORT, data);
-  }
-
   // ===== NEW ERROR ANALYSIS DASHBOARD APIs =====
   async getDetailedErrorList(filters: {
     page?: number;
@@ -212,10 +213,6 @@ class ApiClient {
     return this.post('/scheduled-reports', data);
   }
 
-  async updateScheduledReport(id: string, data: any): Promise<ApiResponse<any>> {
-    return this.put(`/scheduled-reports/${id}`, data);
-  }
-
   async deleteScheduledReport(id: string): Promise<ApiResponse<any>> {
     return this.delete(`/scheduled-reports/${id}`);
   }
@@ -230,6 +227,53 @@ class ApiClient {
 
   async getReportHistory(reportId: string): Promise<ApiResponse<any>> {
     return this.get(`/scheduled-reports/${reportId}/history`);
+  }
+
+  // ===== AI CHAT APIs =====
+  async sendChatMessage(message: string, chatHistory: any[] = []): Promise<ApiResponse<any>> {
+    return this.post(ENDPOINTS.AI_CHAT.MESSAGE, { message, chatHistory });
+  }
+
+  async generateAIReport(reportType: string = 'comprehensive', timeframe: string = '30_days', includeExcel: boolean = true): Promise<ApiResponse<any>> {
+    return this.post(ENDPOINTS.AI_CHAT.GENERATE_REPORT, { reportType, timeframe, includeExcel });
+  }
+
+  async getChatHistory(limit: number = 50, offset: number = 0): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    params.set('limit', limit.toString());
+    params.set('offset', offset.toString());
+    return this.get(`${ENDPOINTS.AI_CHAT.HISTORY}?${params.toString()}`);
+  }
+
+  async downloadAIReport(filename: string): Promise<Response> {
+    const token = this.getToken();
+    return fetch(`${this.baseUrl}${ENDPOINTS.AI_CHAT.DOWNLOAD}/${filename}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
+  // ===== TEAMS & TEMPLATES APIs =====
+  async getReportTemplates(): Promise<ApiResponse<any>> {
+    return this.get(ENDPOINTS.AI_AGENT.REPORT_TEMPLATES);
+  }
+
+  async scheduleReport(reportData: any): Promise<ApiResponse<any>> {
+    return this.post(ENDPOINTS.AI_AGENT.SCHEDULE, reportData);
+  }
+
+  async updateScheduledReport(id: string, reportData: any): Promise<ApiResponse<any>> {
+    return this.put(`${ENDPOINTS.AI_AGENT.SCHEDULE}/${id}`, reportData);
+  }
+
+  async triggerScheduledReport(id: string): Promise<ApiResponse<any>> {
+    return this.post(`${ENDPOINTS.AI_AGENT.SCHEDULE}/${id}/trigger`);
+  }
+
+  async sendTeamsNotification(data: any): Promise<ApiResponse<any>> {
+    return this.post(ENDPOINTS.AI_AGENT.TEAMS_SEND, data);
   }
 
   // ===== DASHBOARD OVERVIEW APIs =====

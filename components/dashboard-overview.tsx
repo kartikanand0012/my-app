@@ -192,7 +192,7 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
   return (
     <div className="space-y-6">
       {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {userRole === "employee" ? (
           <>
             <Card>
@@ -388,7 +388,8 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
           grid-cols-1
         `}
       >
-        <div className="flex flex-col items-stretch">
+        <div className="flex flex-col items-stretch" >
+        <Card className="p-2" style={{height:'550px'}}>
           <DonutChart
             data={agentErrorDistribution}
             title="Agent Error Types"
@@ -396,15 +397,18 @@ export function DashboardOverview({ userRole }: DashboardOverviewProps) {
             height={110}
             alignLeft={true}
           />
+          </Card>
         </div>
-        <div className="flex flex-col items-stretch">
+        <div className="flex flex-col items-stretch" >
+        <Card className="p-2" style={{height:'550px'}}>
           <DonutChart
             data={iaErrorDistribution}
             title="IA Error Types"
             description="Breakdown of IA error types"
-            height={110}
+            height={130}
             alignLeft={true}
           />
+          </Card>
         </div>
       </div>
     </div>

@@ -85,9 +85,6 @@ export default function VideoKYCDashboard() {
           <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              {(userRole === "admin" || userRole === "team-lead") && (
-                <TabsTrigger value="ai-automation">AI & Automation</TabsTrigger>
-              )}
               <TabsTrigger value="performance">
                 {userRole === "agent" ? "My Performance" : "Agent Performance"}
               </TabsTrigger>
@@ -108,12 +105,6 @@ export default function VideoKYCDashboard() {
             <TabsContent value="overview">
               <DashboardOverview userRole={userRole === "agent" ? "employee" : userRole} />
             </TabsContent>
-
-            {(userRole === "admin" || userRole === "team-lead") && (
-              <TabsContent value="ai-automation">
-                <AIQueryAutomationPanel userRole={userRole} />
-              </TabsContent>
-            )}
 
             <TabsContent value="performance">
               <AgentPerformanceDashboard

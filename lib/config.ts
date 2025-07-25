@@ -1,6 +1,6 @@
 export const API_CONFIG = {
-  BASE_URL: 'http://localhost:3001/api',
-  //BASE_URL: 'https://my-app-be-u7uh.onrender.com/api',
+  //BASE_URL: 'http://localhost:3001/api',
+  BASE_URL: 'https://my-app-be-u7uh.onrender.com/api',
   USE_MOCK_API: process.env.NEXT_PUBLIC_USE_MOCK_API === 'true' || false,
 };
 
@@ -9,7 +9,7 @@ export const ENDPOINTS = {
     LOGIN: '/auth/login',
     LOGOUT: '/auth/logout',
     PROFILE: '/auth/profile',
-    DASHBOARD_STATS: '/analytics/dashboard-stats',
+    DASHBOARD_STATS: '/auth/dashboard/stats',
     AGENTS: '/auth/agents',
   },
   AI_AGENT: {
@@ -18,11 +18,7 @@ export const ENDPOINTS = {
     PROMPTS: '/ai-agent/prompts',
     PROMPTS_USE: '/ai-agent/prompts',
     REPORT_GENERATE: '/ai-agent/report/generate',
-    REPORT_TEMPLATES: '/ai-agent/report/templates',
-    EXPORT_CSV: '/ai-agent/report/export/csv',
     SCHEDULE: '/ai-agent/schedule',
-    SCHEDULER_TOGGLE: '/ai-agent/scheduler/toggle',
-    SCHEDULER_STATUS: '/ai-agent/scheduler/status',
     TEAMS_SEND: '/ai-agent/teams/send',
     TEAMS_TEST: '/ai-agent/teams/test',
     SESSION: '/ai-agent/session',
@@ -52,13 +48,6 @@ export const ENDPOINTS = {
     ERROR_DETAILS: '/error-analytics/error-details',
     ACKNOWLEDGE_ERROR: '/error-analytics/error',
     APPROVE_ERROR: '/error-analytics/error',
-    
-    // NEW Error Analysis Dashboard APIs
-    DETAILED_ERROR_LIST: '/error-analytics/detailed-error-list',
-    AGENT_REJECTION_PIE_CHART: '/error-analytics/agent-rejection-pie-chart',
-    IA_ERROR_TYPES_PIE_CHART: '/error-analytics/ia-error-types-pie-chart',
-    ERROR_TRENDS_CHART: '/error-analytics/error-trends-chart',
-    SYNC_ERROR_ANALYSIS: '/error-analytics/sync-error-analysis',
     
     // AI Reporting APIs
     SAVED_QUERIES: '/error-analytics/saved-queries',

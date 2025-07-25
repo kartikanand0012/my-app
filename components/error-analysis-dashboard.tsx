@@ -47,6 +47,7 @@ import { format } from "date-fns"
 import { useAuth } from "@/lib/auth-context"
 import { useDashboard } from "@/lib/dashboard-context"
 import { apiClient } from "@/lib/api-client"
+import { DonutChart } from "@/components/ui/donut-chart";
 
 interface ErrorAnalysisDashboardProps {
   userRole: "admin" | "team-lead" | "agent"
@@ -98,6 +99,8 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     errorStats,
     errorTrendData,
     errorTypesData,
+    agentErrorTypesData,
+    iaErrorTypesData,
     errorDetails,
     savedQueries: contextSavedQueries,
     scheduledReports: contextScheduledReports,
@@ -115,8 +118,11 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   const [typeFilter, setTypeFilter] = useState("all")
   const [uuidFilter, setUuidFilter] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [todayCurrentPage, setTodayCurrentPage] = useState(1)
+  const [pastCurrentPage, setPastCurrentPage] = useState(1)
   const [errors, setErrors] = useState<ErrorData[]>([])
   const [filteredErrors, setFilteredErrors] = useState<ErrorData[]>([])
+  const itemsPerPage = 10
 
   // AI Reporting System States
   const [aiQuery, setAiQuery] = useState("")
@@ -147,6 +153,19 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   }])
   const [isTyping, setIsTyping] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Enhanced functionality states
+  const [reportTemplates, setReportTemplates] = useState<any[]>([])
+  const [selectedReportTemplate, setSelectedReportTemplate] = useState("")
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingReport, setEditingReport] = useState<any>(null)
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [sendingReport, setSendingReport] = useState(false)
+  const [loadingDailyReport, setLoadingDailyReport] = useState(false)
+  const [loadingWeeklyReport, setLoadingWeeklyReport] = useState(false)
+  const [schedulingDaily, setSchedulingDaily] = useState(false)
+  const [schedulingWeekly, setSchedulingWeekly] = useState(false)
 
   // Load error trends data only once on mount
   const hasLoadedTrends = useRef(false)
@@ -184,46 +203,78 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       console.log('🔄 Initial load of error details...')
       hasInitiallyLoaded.current = true
       loadErrorDetails()
+      loadReportTemplates()
     }
   }, [contextLoading, loadErrorDetails])
 
-  // Fetch filtered error details using NEW detailed error list API
+  // Load report templates from backend
+  const loadReportTemplates = async () => {
+    setLoadingTemplates(true)
+    try {
+      const response = await apiClient.getReportTemplates()
+      if (response.success && response.data?.templates) {
+        setReportTemplates(response.data.templates)
+        console.log('📋 Loaded report templates:', response.data.templates.length)
+      }
+    } catch (error) {
+      console.error('Error loading report templates:', error)
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }
+
+  // Fetch filtered error details using OPTIMIZED vkyc_details-based API
   const fetchFilteredErrorDetails = async () => {
     try {
+      console.log('🔍 Fetching filtered error details with optimized API...')
+      
       const filters = {
         date_filter: getDateFilterString(),
-        search: searchTerm || undefined,
+        search: searchTerm?.trim() || undefined,
         error_type_filter: typeFilter !== 'all' ? typeFilter : undefined,
         agent_id_filter: selectedAgent || undefined,
         page: currentPage,
-        limit: 50
+        limit: 10
       }
       
+      console.log('📋 API filters:', filters)
+      
       const response = await apiClient.getDetailedErrorList(filters)
+      console.log('✅ API response:', response)
+      
       if (response.success && response.data && response.data.errors) {
-        // Transform the new API data format to match the expected format
+        // Transform the optimized API data format to match the expected frontend format
         const transformedErrors = response.data.errors.map((error: any) => ({
           id: error.uuid,
           uuid: error.uuid,
           agentId: error.agentId?.toString() || '',
-          agentName: error.agentName,
+          agentName: error.agentName || 'Unknown Agent',
           type: error.errorType,
-          date: new Date(error.sessionStartedAt).toLocaleDateString(),
-          time: new Date(error.sessionStartedAt).toLocaleTimeString(),
+          date: error.sessionStartedAt ? new Date(error.sessionStartedAt).toLocaleDateString() : new Date().toLocaleDateString(),
+          time: error.sessionStartedAt ? new Date(error.sessionStartedAt).toLocaleTimeString() : '',
           description: error.rejectionReason || error.reviewComments || 'Error detected',
           videoId: error.sessionId,
           status: (error.errorType === 'agent_rejected' ? 'acknowledged' : 
                  error.errorType === 'ia_flagged_critical' ? 'pending' : 'approved') as "pending" | "approved" | "rejected" | "acknowledged",
           category: error.agentRejectionCategory || error.iaErrorCategory,
           severity: error.errorSeverity,
-          sessionId: error.sessionId
+          sessionId: error.sessionId,
+          sessionStartedAt: error.sessionStartedAt,
+          // Additional fields for better data handling
+          vkycStatus: error.vkycStatus,
+          reviewStatus: error.reviewStatus,
+          reviewComments: error.reviewComments,
+          rejectionReason: error.rejectionReason
         }))
+        
+        console.log('📊 Transformed errors:', transformedErrors.length, 'records')
         setFilteredErrors(transformedErrors)
       } else {
+        console.log('❌ No error data received from API')
         setFilteredErrors([])
       }
     } catch (err) {
-      console.error('Error fetching filtered error details:', err)
+      console.error('❌ Error fetching filtered error details:', err)
       setFilteredErrors([])
     }
   }
@@ -233,12 +284,17 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   const lastFetchParamsRef = useRef<string>('')
   
 
-  // Create debounced function outside useEffect
+  // Optimized debounced function with better parameter tracking
   const debouncedFetchFilteredErrorDetails = useCallback(() => {
     const currentParams = JSON.stringify({
-      searchTerm, statusFilter, typeFilter, uuidFilter, 
-      dateFrom: dateFrom?.toISOString(), dateTo: dateTo?.toISOString(), 
-      currentPage, selectedAgent
+      searchTerm: searchTerm?.trim() || '', 
+      statusFilter, 
+      typeFilter, 
+      uuidFilter: uuidFilter?.trim() || '', 
+      dateFrom: dateFrom?.toISOString() || '', 
+      dateTo: dateTo?.toISOString() || '', 
+      currentPage, 
+      selectedAgent: selectedAgent || ''
     })
     
     // Skip if parameters haven't changed
@@ -247,76 +303,133 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       return
     }
     
+    // Clear existing timeout
     if (debouncedFetchRef.current) {
       clearTimeout(debouncedFetchRef.current)
     }
     
+    // Set new timeout with improved debouncing
     debouncedFetchRef.current = setTimeout(() => {
-      console.log('🔍 Making API call after debounce')
+      console.log('🔍 Making optimized API call after debounce')
+      console.log('📋 Parameters changed from:', lastFetchParamsRef.current)
+      console.log('📋 Parameters changed to:', currentParams)
       lastFetchParamsRef.current = currentParams
       fetchFilteredErrorDetails()
-    }, 500)
-  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, currentPage, selectedAgent])
+    }, 300) // Reduced debounce time for better UX
+  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, currentPage, selectedAgent]) // Removed fetchFilteredErrorDetails to prevent infinite loop
 
-  // Simplified filter logic - only call API when actual filters are applied
+  // Reset pagination when filters change
   useEffect(() => {
-    const hasActiveFilters = searchTerm.trim() || 
+    setTodayCurrentPage(1)
+    setPastCurrentPage(1)
+  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, selectedAgent])
+
+  // OPTIMIZED filter logic - prevents multiple API calls and unnecessary re-renders
+  useEffect(() => {
+    const hasActiveFilters = (searchTerm?.trim()) || 
                            statusFilter !== 'all' || 
                            typeFilter !== 'all' || 
-                           uuidFilter.trim() || 
+                           (uuidFilter?.trim()) || 
                            dateFrom || 
-                           dateTo
+                           dateTo ||
+                           selectedAgent
     
     if (hasActiveFilters) {
-      console.log('🔍 Filters detected, calling debounced API')
-      debouncedFetchFilteredErrorDetails()
+      console.log('🔍 Active filters detected, calling optimized API:', {
+        searchTerm: searchTerm?.trim(),
+        statusFilter,
+        typeFilter, 
+        uuidFilter: uuidFilter?.trim(),
+        dateFrom: dateFrom?.toISOString(),
+        dateTo: dateTo?.toISOString(),
+        selectedAgent
+      })
+      
+      // Call the debounced function directly to avoid dependency issues
+      const currentParams = JSON.stringify({
+        searchTerm: searchTerm?.trim() || '', 
+        statusFilter, 
+        typeFilter, 
+        uuidFilter: uuidFilter?.trim() || '', 
+        dateFrom: dateFrom?.toISOString() || '', 
+        dateTo: dateTo?.toISOString() || '', 
+        currentPage, 
+        selectedAgent: selectedAgent || ''
+      })
+      
+      // Skip if parameters haven't changed
+      if (lastFetchParamsRef.current === currentParams) {
+        console.log('⏭️ Skipping API call - parameters unchanged')
+        return
+      }
+      
+      // Clear existing timeout
+      if (debouncedFetchRef.current) {
+        clearTimeout(debouncedFetchRef.current)
+      }
+      
+      // Set new timeout with improved debouncing
+      debouncedFetchRef.current = setTimeout(() => {
+        console.log('🔍 Making optimized API call after debounce')
+        lastFetchParamsRef.current = currentParams
+        fetchFilteredErrorDetails()
+      }, 300)
     } else {
-      console.log('📋 No filters, using context data')
+      console.log('📋 No active filters, using context data')
       // Clear any pending API calls
       if (debouncedFetchRef.current) {
         clearTimeout(debouncedFetchRef.current)
         debouncedFetchRef.current = null
       }
       
-      // Transform context data only when it changes
-      if (errorDetails?.length > 0) {
-        const transformedErrors = errorDetails.map((error: any) => ({
-          id: error.uuid || error.id,
-          uuid: error.uuid || error.id,
-          agentId: error.agentId?.toString() || '',
-          agentName: error.agentName || 'Unknown Agent',
-          type: error.errorType || error.type || 'Unknown',
-          date: error.sessionStartedAt ? new Date(error.sessionStartedAt).toLocaleDateString() : new Date().toLocaleDateString(),
-          time: error.sessionStartedAt ? new Date(error.sessionStartedAt).toLocaleTimeString() : '',
-          description: error.rejectionReason || error.reviewComments || error.description || 'Error detected',
-          videoId: error.sessionId || error.videoId || '',
-          status: (error.errorType === 'agent_rejected' ? 'acknowledged' : 
-                 error.errorType === 'ia_flagged_critical' ? 'pending' : 'approved') as "pending" | "approved" | "rejected" | "acknowledged",
-          category: error.agentRejectionCategory || error.iaErrorCategory || error.category,
-          severity: error.errorSeverity || error.severity,
-          sessionId: error.sessionId || error.videoId,
-          sessionStartedAt: error.sessionStartedAt
-        }))
-        setFilteredErrors(transformedErrors)
+      // Use context data when no filters are active - this prevents unnecessary API calls
+      if (errorDetails && Array.isArray(errorDetails)) {
+        console.log('📊 Using context data:', errorDetails.length, 'records')
+        
+        // Only transform if we have data
+        if (errorDetails.length > 0) {
+          const transformedErrors = errorDetails.map((error: any) => ({
+            id: error.uuid || error.id,
+            uuid: error.uuid || error.id,
+            agentId: error.agentId?.toString() || '',
+            agentName: error.agentName || 'Unknown Agent',
+            type: error.errorType || error.type || 'Unknown',
+            date: error.sessionStartedAt ? new Date(error.sessionStartedAt).toLocaleDateString() : new Date().toLocaleDateString(),
+            time: error.sessionStartedAt ? new Date(error.sessionStartedAt).toLocaleTimeString() : '',
+            description: error.rejectionReason || error.reviewComments || error.description || 'Error detected',
+            videoId: error.sessionId || error.videoId || '',
+            status: (error.errorType === 'agent_rejected' ? 'acknowledged' : 
+                   error.errorType === 'ia_flagged_critical' ? 'pending' : 'approved') as "pending" | "approved" | "rejected" | "acknowledged",
+            category: error.agentRejectionCategory || error.iaErrorCategory || error.category,
+            severity: error.errorSeverity || error.severity,
+            sessionId: error.sessionId || error.videoId,
+            sessionStartedAt: error.sessionStartedAt
+          }))
+          setFilteredErrors(transformedErrors)
+        } else {
+          setFilteredErrors([])
+        }
       } else {
         setFilteredErrors([])
       }
     }
-  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, debouncedFetchFilteredErrorDetails])
+  }, [searchTerm, statusFilter, typeFilter, uuidFilter, dateFrom, dateTo, currentPage, selectedAgent]) // Removed debouncedFetchFilteredErrorDetails to prevent infinite loop
 
-  // Transform context data when errorDetails change (minimal dependency)
+  // Optimized context data transformation - only updates when errorDetails actually change
   useEffect(() => {
-    const hasActiveFilters = searchTerm.trim() || 
+    const hasActiveFilters = (searchTerm?.trim()) || 
                            statusFilter !== 'all' || 
                            typeFilter !== 'all' || 
-                           uuidFilter.trim() || 
+                           (uuidFilter?.trim()) || 
                            dateFrom || 
-                           dateTo
+                           dateTo ||
+                           selectedAgent
     
-    // Only use context data when no filters are active
-    if (!hasActiveFilters && errorDetails?.length >= 0) {
-      console.log('📊 Context data changed, transforming...')
-      if (errorDetails.length > 0) {
+    // Only update from context data when no filters are active and errorDetails has changed
+    if (!hasActiveFilters && errorDetails) {
+      console.log('📊 Context errorDetails changed, updating display data')
+      
+      if (Array.isArray(errorDetails) && errorDetails.length > 0) {
         const transformedErrors = errorDetails.map((error: any) => ({
           id: error.uuid || error.id,
           uuid: error.uuid || error.id,
@@ -339,7 +452,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         setFilteredErrors([])
       }
     }
-  }, [errorDetails])
+  }, [errorDetails]) // Only depend on errorDetails, not on filter states
 
   // Load saved queries, scheduled reports, and team members only once
   const hasLoadedAPIData = useRef(false)
@@ -465,13 +578,8 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         selectedTemplate
       }
 
-      // Simulate API delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      const response = await apiClient.generateAIReport({
-        query: currentQuery,
-        filters: currentFilters
-      })
+      // Use new conversational AI chat API
+      const response = await apiClient.sendChatMessage(currentQuery, chatMessages)
 
       setIsTyping(false)
 
@@ -480,7 +588,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         const aiResponse = {
           id: (Date.now() + 1).toString(),
           type: 'ai' as const,
-          content: formatAIResponse(response.data),
+          content: response.data.message || response.data.analysis || 'I apologize, but I received an empty response.',
           timestamp: new Date()
         }
         
@@ -629,11 +737,6 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
     }
   }
 
-  const handleScheduleReport = async (queryId: string) => {
-    // This would open a scheduling dialog
-    alert(`Scheduling functionality for query ${queryId} - To be implemented with full scheduling UI`)
-  }
-
   const handleSyncErrorAnalysis = async () => {
     if (userRole !== 'admin') {
       alert('Only administrators can sync error analysis data')
@@ -655,6 +758,188 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
       alert('Failed to sync error analysis data')
     } finally {
       setIsSyncing(false)
+    }
+  }
+
+  // Generate and download Excel report
+  const handleGenerateExcelReport = async () => {
+    try {
+      setIsGeneratingReport(true)
+      
+      // Show generating message in chat
+      const generatingMessage = {
+        id: Date.now().toString(),
+        type: 'ai' as const,
+        content: '📊 Generating comprehensive Excel report with AI insights... This may take a moment.',
+        timestamp: new Date()
+      }
+      setChatMessages(prev => [...prev, generatingMessage])
+      
+      const response = await apiClient.generateAIReport('comprehensive', '30_days', true)
+      
+      if (response.success && response.data?.excel?.filename) {
+        // Add success message to chat
+        const successMessage = {
+          id: (Date.now() + 1).toString(),
+          type: 'ai' as const,
+          content: `✅ Excel report "${response.data.excel.filename}" generated successfully! The report includes:\n\n📈 Executive Summary with key insights\n👥 Agent Performance Analysis\n❌ Error Analysis with detailed breakdown\n🤖 AI-generated insights and recommendations\n\nClick the download button below to save the report.`,
+          timestamp: new Date()
+        }
+        setChatMessages(prev => [...prev, successMessage])
+        
+        // Trigger download
+        const downloadResponse = await apiClient.downloadAIReport(response.data.excel.filename)
+        
+        if (downloadResponse.ok) {
+          const blob = await downloadResponse.blob()
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = response.data.excel.filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+          
+          // Add download confirmation to chat
+          const downloadMessage = {
+            id: (Date.now() + 2).toString(),
+            type: 'ai' as const,
+            content: '📥 Report downloaded successfully! You can now open it in Excel to view the detailed analysis.',
+            timestamp: new Date()
+          }
+          setChatMessages(prev => [...prev, downloadMessage])
+        }
+      } else {
+        throw new Error(response.message || 'Failed to generate Excel report')
+      }
+    } catch (error: any) {
+      console.error('Error generating Excel report:', error)
+      
+      const errorMessage = {
+        id: Date.now().toString(),
+        type: 'ai' as const,
+        content: `❌ I encountered an error while generating the Excel report: ${error.message || 'Unknown error'}. Please try again or contact support if the issue persists.`,
+        timestamp: new Date()
+      }
+      setChatMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsGeneratingReport(false)
+    }
+  }
+
+  // Enhanced functionality for Load and Schedule buttons
+  const handleLoadReport = async (templateId: string) => {
+    try {
+      setIsGeneratingReport(true)
+      
+      const template = reportTemplates.find(t => t.id === templateId)
+      if (!template) return
+      
+      const reportMessage = {
+        id: Date.now().toString(),
+        type: 'user' as const,
+        content: `Load ${template.name} report`,
+        timestamp: new Date()
+      }
+      setChatMessages(prev => [...prev, reportMessage])
+      
+      // Generate report using template
+      const response = await apiClient.sendChatMessage(
+        `Generate a ${template.name} report: ${template.description}`,
+        chatMessages
+      )
+      
+      if (response.success) {
+        const aiResponse = {
+          id: (Date.now() + 1).toString(),
+          type: 'ai' as const,
+          content: response.data.message,
+          timestamp: new Date()
+        }
+        setChatMessages(prev => [...prev, aiResponse])
+      }
+    } catch (error) {
+      console.error('Error loading report:', error)
+    } finally {
+      setIsGeneratingReport(false)
+    }
+  }
+
+  const handleScheduleReport = (templateId: string) => {
+    const template = reportTemplates.find(t => t.id === templateId)
+    if (template) {
+      setSelectedReportTemplate(templateId)
+      setShowScheduleModal(true)
+    }
+  }
+
+  const handleEditReport = (report: any) => {
+    setEditingReport(report)
+    setShowEditModal(true)
+  }
+
+  const handleTriggerReport = async (reportId: string) => {
+    try {
+      setSendingReport(true)
+      const response = await apiClient.triggerScheduledReport(reportId)
+      
+      if (response.success) {
+        alert('Report triggered successfully! It will be sent to the configured channels.')
+      } else {
+        alert('Failed to trigger report: ' + response.message)
+      }
+    } catch (error) {
+      console.error('Error triggering report:', error)
+      alert('Failed to trigger report')
+    } finally {
+      setSendingReport(false)
+    }
+  }
+
+  const handleSendNow = async () => {
+    try {
+      setSendingReport(true)
+      
+      const payload = {
+        message: customMessage,
+        template: selectedReportTemplate,
+        recipients: selectedRecipients,
+        tagAllUsers: tagAllUsers,
+        errorData: filteredErrors.slice(0, 20),
+        filters: {
+          dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
+          dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
+          statusFilter,
+          typeFilter,
+          searchTerm
+        },
+        timestamp: new Date().toISOString()
+      }
+      
+      console.log('🚀 SEND NOW PAYLOAD:', JSON.stringify(payload, null, 2))
+      
+      const response = await apiClient.sendTeamsNotification(payload)
+      
+      if (response.success) {
+        alert('Report sent successfully to Teams!')
+        
+        // Add success message to chat
+        const successMessage = {
+          id: Date.now().toString(),
+          type: 'ai' as const,
+          content: `✅ Report sent successfully to Teams! Recipients: ${tagAllUsers ? 'All team members' : selectedRecipients.join(', ')}`,
+          timestamp: new Date()
+        }
+        setChatMessages(prev => [...prev, successMessage])
+      } else {
+        alert('Failed to send report: ' + response.message)
+      }
+    } catch (error) {
+      console.error('Error sending report:', error)
+      alert('Failed to send report')
+    } finally {
+      setSendingReport(false)
     }
   }
 
@@ -681,19 +966,31 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
 
   // Separate today's and past errors with better date handling
   const today = new Date().toLocaleDateString() // Use local date format for comparison
-  const todayErrors = filteredErrors.filter((error) => {
+  const allTodayErrors = filteredErrors.filter((error) => {
     const errorDate = new Date(error.sessionStartedAt || error.date).toLocaleDateString()
     return errorDate === today
   })
-  const pastErrors = filteredErrors.filter((error) => {
+  const allPastErrors = filteredErrors.filter((error) => {
     const errorDate = new Date(error.sessionStartedAt || error.date).toLocaleDateString()
     return errorDate !== today
   })
 
+  // Paginated data
+  const todayStartIndex = (todayCurrentPage - 1) * itemsPerPage
+  const pastStartIndex = (pastCurrentPage - 1) * itemsPerPage
+  const todayErrors = allTodayErrors.slice(todayStartIndex, todayStartIndex + itemsPerPage)
+  const pastErrors = allPastErrors.slice(pastStartIndex, pastStartIndex + itemsPerPage)
+  
+  // Calculate total pages
+  const todayTotalPages = Math.ceil(allTodayErrors.length / itemsPerPage)
+  const pastTotalPages = Math.ceil(allPastErrors.length / itemsPerPage)
+
   console.log('📊 Error analysis data:', {
     totalFiltered: filteredErrors.length,
-    todayCount: todayErrors.length,
-    pastCount: pastErrors.length,
+    todayCount: allTodayErrors.length,
+    pastCount: allPastErrors.length,
+    todayPaginated: todayErrors.length,
+    pastPaginated: pastErrors.length,
     contextErrorDetails: errorDetails.length,
     sampleError: filteredErrors[0]
   })
@@ -701,7 +998,7 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   // Local error analytics data (fallback when context data is not available)
   const localErrorStats = {
     total: errors.length,
-    today: todayErrors.length,
+    today: allTodayErrors.length,
     pending: errors.filter((e) => e.status === "pending").length,
     approved: errors.filter((e) => e.status === "approved").length,
     acknowledged: errors.filter((e) => e.status === "acknowledged").length,
@@ -724,6 +1021,17 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
   ]
 
   const COLORS = ["#ef4444", "#f59e0b", "#3b82f6", "#10b981"]
+
+  const agentErrorDistribution = agentErrorTypesData.map((item, index) => ({
+    name: item.type || item.errorType,
+    value: item.count || item.value,
+    color: ["#ef4444", "#f59e0b", "#3b82f6", "#10b981", "#8b5cf6"][index % 5]
+  }));
+  const iaErrorDistribution = iaErrorTypesData.map((item, index) => ({
+    name: item.type || item.errorType,
+    value: item.count || item.value,
+    color: ["#ef4444", "#f59e0b", "#3b82f6", "#10b981", "#8b5cf6"][index % 5]
+  }));
 
   return (
     <div className="space-y-6">
@@ -891,34 +1199,17 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Error Types Distribution</CardTitle>
-            <CardDescription>Breakdown by error category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={errorTypesData || localErrorTypesData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  innerRadius={40}
-                  fill="#8884d8"
-                  dataKey="count"
-                  label={({ type, count }) => `${type}: ${count}`}
-                >
-                  {(errorTypesData || localErrorTypesData).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col md:flex-row gap-6">
+          <Card className="flex-1 p-2" style={{height:'450px'}}>
+            <DonutChart
+              data={iaErrorDistribution}
+              title="IA Error Types"
+              description="Breakdown of IA error types"
+              height={130}
+              alignLeft={true}
+            />
+          </Card>
+        </div>
       </div>
 
       {/* Error Details Tables */}
@@ -934,8 +1225,8 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
         <CardContent>
           <Tabs defaultValue="today" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="today">Today's Errors ({todayErrors.length})</TabsTrigger>
-              <TabsTrigger value="past">Past Errors ({pastErrors.length})</TabsTrigger>
+              <TabsTrigger value="today">Today's Errors ({allTodayErrors.length})</TabsTrigger>
+              <TabsTrigger value="past">Past Errors ({allPastErrors.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="today">
@@ -1033,6 +1324,36 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                   ))}
                 </TableBody>
               </Table>
+              
+              {/* Today's Errors Pagination */}
+              {todayTotalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-gray-600">
+                    Showing {todayStartIndex + 1} to {Math.min(todayStartIndex + itemsPerPage, allTodayErrors.length)} of {allTodayErrors.length} entries
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTodayCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={todayCurrentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm">
+                      Page {todayCurrentPage} of {todayTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTodayCurrentPage(prev => Math.min(prev + 1, todayTotalPages))}
+                      disabled={todayCurrentPage === todayTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="past">
@@ -1113,6 +1434,36 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                   ))}
                 </TableBody>
               </Table>
+              
+              {/* Past Errors Pagination */}
+              {pastTotalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-gray-600">
+                    Showing {pastStartIndex + 1} to {Math.min(pastStartIndex + itemsPerPage, allPastErrors.length)} of {allPastErrors.length} entries
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPastCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={pastCurrentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm">
+                      Page {pastCurrentPage} of {pastTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPastCurrentPage(prev => Math.min(prev + 1, pastTotalPages))}
+                      disabled={pastCurrentPage === pastTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -1262,16 +1613,57 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
               </div>
               
               {/* Quick Actions */}
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <Label className="text-sm font-medium">Quick Actions:</Label>
+                
+                {/* Daily Error Summary */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Daily Error Summary</Label>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleLoadReport('daily_error_summary')}
+                      disabled={loadingDailyReport}
+                    >
+                      {loadingDailyReport ? 'Loading...' : 'Load'}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleScheduleReport('daily_error_summary')}
+                      disabled={schedulingDaily}
+                    >
+                      {schedulingDaily ? 'Scheduling...' : 'Schedule'}
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Weekly Team Performance */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Weekly Team Performance</Label>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleLoadReport('agent_performance_weekly')}
+                      disabled={loadingWeeklyReport}
+                    >
+                      {loadingWeeklyReport ? 'Loading...' : 'Load'}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleScheduleReport('agent_performance_weekly')}
+                      disabled={schedulingWeekly}
+                    >
+                      {schedulingWeekly ? 'Scheduling...' : 'Schedule'}
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Other Quick Actions */}
                 <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setAiQuery("Generate a summary of today's errors with performance impact analysis")}
-                  >
-                    Daily Summary
-                  </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -1292,6 +1684,16 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                     onClick={() => setAiQuery("Generate a detailed report for management")}
                   >
                     Management Report
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleGenerateExcelReport}
+                    disabled={isGeneratingReport}
+                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                  >
+                    <FileSpreadsheet className="w-3 h-3 mr-1" />
+                    {isGeneratingReport ? 'Generating...' : 'Excel Report'}
                   </Button>
                 </div>
               </div>
@@ -1390,10 +1792,22 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-1">
-                              <Button size="sm" variant="outline">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleEditReport(report)}
+                                title="Edit Report Settings"
+                              >
                                 <Settings className="w-3 h-3" />
                               </Button>
-                              <Button size="sm" variant="outline">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleTriggerReport(report.id)}
+                                disabled={sendingReport}
+                                title="Trigger Report Now"
+                                className="text-blue-600 hover:text-blue-800"
+                              >
                                 <Send className="w-3 h-3" />
                               </Button>
                             </div>
@@ -1493,6 +1907,29 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
                     </div>
                   )}
                   
+                  {/* Teams Report Templates */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Report Template</Label>
+                    <Select value={selectedReportTemplate} onValueChange={setSelectedReportTemplate}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select report template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {loadingTemplates ? (
+                          <SelectItem value="loading" disabled>Loading templates...</SelectItem>
+                        ) : reportTemplates.length > 0 ? (
+                          reportTemplates.map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-templates" disabled>No templates available</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
                   <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select message template" />
@@ -1515,22 +1952,16 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
 
               <div className="space-y-4">
                 <h4 className="font-medium">Quick Actions</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleSendTeamNotification(generatedReport)}>
+                <div className="grid grid-cols-1 gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleSendNow}
+                    disabled={sendingReport}
+                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                  >
                     <Send className="w-3 h-3 mr-1" />
-                    Send Now
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <MessageSquare className="w-3 h-3 mr-1" />
-                    Teams Settings
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Users className="w-3 h-3 mr-1" />
-                    Manage Recipients
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Tag className="w-3 h-3 mr-1" />
-                    Tag Settings
+                    {sendingReport ? 'Sending...' : 'Send Now'}
                   </Button>
                 </div>
                 
@@ -1581,6 +2012,131 @@ export function ErrorAnalysisDashboard({ userRole, selectedAgent }: ErrorAnalysi
               </Button>
               <Button onClick={handleSaveQuery} disabled={!queryName.trim() || savingQuery}>
                 {savingQuery ? 'Saving...' : 'Save Query'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Schedule Report</h3>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="schedule-type">Schedule Type</Label>
+                <Select defaultValue="daily">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select schedule type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="schedule-time">Time</Label>
+                <Input
+                  id="schedule-time"
+                  type="time"
+                  defaultValue="09:00"
+                />
+              </div>
+              <div>
+                <Label htmlFor="schedule-recipients">Recipients</Label>
+                <Textarea
+                  id="schedule-recipients"
+                  placeholder="Enter email addresses separated by commas"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <Button variant="outline" onClick={() => setShowScheduleModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                alert('Report scheduled successfully!')
+                setShowScheduleModal(false)
+              }}>
+                Schedule Report
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Report Modal */}
+      {showEditModal && editingReport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <h3 className="text-lg font-semibold mb-4">Edit Report Settings</h3>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-name">Report Name</Label>
+                <Input
+                  id="edit-name"
+                  defaultValue={editingReport.name}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-schedule">Schedule</Label>
+                <Input
+                  id="edit-schedule"
+                  defaultValue={editingReport.schedule}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-recipients">Recipients</Label>
+                <Textarea
+                  id="edit-recipients"
+                  defaultValue={editingReport.recipients.join(', ')}
+                  rows={3}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch id="edit-active" defaultChecked={editingReport.status === 'active'} />
+                <Label htmlFor="edit-active">Active</Label>
+              </div>
+              <div>
+                <Label htmlFor="edit-tags">Tagged Users</Label>
+                <div className="space-y-2">
+                  {teamMembers.map((member) => (
+                    <div key={member.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`edit-member-${member.id}`}
+                        defaultChecked={editingReport.recipients.includes(member.name)}
+                        className="rounded"
+                      />
+                      <Label htmlFor={`edit-member-${member.id}`} className="text-sm cursor-pointer">
+                        {member.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-message">Custom Message</Label>
+                <Textarea
+                  id="edit-message"
+                  placeholder="Custom message for this report..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <Button variant="outline" onClick={() => setShowEditModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                alert('Report settings updated successfully!')
+                setShowEditModal(false)
+              }}>
+                Update Report
               </Button>
             </div>
           </div>
